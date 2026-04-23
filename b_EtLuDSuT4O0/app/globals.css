@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #04091A;
+  --foreground: #E8EAED;
+  --card: #0F1729;
+  --card-foreground: #E8EAED;
+  --popover: #0F1729;
+  --popover-foreground: #E8EAED;
+  --primary: #5B8DEF;
+  --primary-foreground: #04091A;
+  --secondary: #1B2D4D;
+  --secondary-foreground: #E8EAED;
+  --muted: #1B2D4D;
+  --muted-foreground: #8B94A8;
+  --accent: #5B8DEF;
+  --accent-foreground: #04091A;
+  --destructive: #EF5B5B;
+  --destructive-foreground: #FFFFFF;
+  --border: #1B2D4D;
+  --input: #0F1729;
+  --ring: #5B8DEF;
+  --chart-1: #5B8DEF;
+  --chart-2: #4A7FD4;
+  --chart-3: #3A71BA;
+  --chart-4: #2A639F;
+  --chart-5: #1A5585;
+  --radius: 0.625rem;
+  --sidebar: #0F1729;
+  --sidebar-foreground: #E8EAED;
+  --sidebar-primary: #5B8DEF;
+  --sidebar-primary-foreground: #04091A;
+  --sidebar-accent: #5B8DEF;
+  --sidebar-accent-foreground: #04091A;
+  --sidebar-border: #1B2D4D;
+  --sidebar-ring: #5B8DEF;
+}
+
+.dark {
+  --background: #04091A;
+  --foreground: #E8EAED;
+  --card: #0F1729;
+  --card-foreground: #E8EAED;
+  --popover: #0F1729;
+  --popover-foreground: #E8EAED;
+  --primary: #5B8DEF;
+  --primary-foreground: #04091A;
+  --secondary: #1B2D4D;
+  --secondary-foreground: #E8EAED;
+  --muted: #1B2D4D;
+  --muted-foreground: #8B94A8;
+  --accent: #5B8DEF;
+  --accent-foreground: #04091A;
+  --destructive: #EF5B5B;
+  --destructive-foreground: #FFFFFF;
+  --border: #1B2D4D;
+  --input: #0F1729;
+  --ring: #5B8DEF;
+  --chart-1: #5B8DEF;
+  --chart-2: #4A7FD4;
+  --chart-3: #3A71BA;
+  --chart-4: #2A639F;
+  --chart-5: #1A5585;
+  --sidebar: #0F1729;
+  --sidebar-foreground: #E8EAED;
+  --sidebar-primary: #5B8DEF;
+  --sidebar-primary-foreground: #04091A;
+  --sidebar-accent: #5B8DEF;
+  --sidebar-accent-foreground: #04091A;
+  --sidebar-border: #1B2D4D;
+  --sidebar-ring: #5B8DEF;
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+  }
+  
+  .glass-sm {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-lg;
+  }
+  
+  .glow-blue {
+    @apply shadow-[0_0_20px_rgba(91,141,239,0.3)];
+  }
+  
+  .gradient-button {
+    @apply bg-gradient-to-br from-[#5B8DEF] to-[#3A71BA] hover:from-[#4A7FD4] hover:to-[#2A639F] transition-all duration-300;
+  }
+}
