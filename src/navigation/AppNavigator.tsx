@@ -2,6 +2,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { StyleSheet, Text, View } from "react-native";
+import LockScreen from "../screens/LockScreen";
 
 export type RootStackParamList = {
   Lock: undefined;
@@ -26,10 +27,6 @@ function PlaceholderScreen({ title }: PlaceholderScreenProps): React.JSX.Element
       <Text style={styles.subtitle}>Screen implementation pending</Text>
     </View>
   );
-}
-
-function LockScreen(): React.JSX.Element {
-  return <PlaceholderScreen title="Lock Screen" />;
 }
 
 function MasterPasswordScreen(): React.JSX.Element {
