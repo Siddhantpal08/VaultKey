@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
+import { useFocusEffect } from "@react-navigation/native";
 import { StackScreenProps } from "@react-navigation/stack";
 import {
   Alert,
@@ -9,7 +10,9 @@ import {
   Text,
   View,
 } from "react-native";
+import { getSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import { hasSessionKey } from "../security/crypto";
 
 type LockScreenProps = StackScreenProps<RootStackParamList, "Lock">;
 
@@ -19,32 +22,66 @@ const DEMO_PIN = "1234";
 export default function LockScreen({ navigation }: LockScreenProps): React.JSX.Element {
   const [attemptsLeft, setAttemptsLeft] = useState<number>(MAX_ATTEMPTS);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState<boolean>(false);
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState<boolean>(true);
   const [biometricLabel, setBiometricLabel] = useState<string>("Biometric");
   const [pin, setPin] = useState<string>("");
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [maxAttempts, setMaxAttempts] = useState<number>(MAX_ATTEMPTS);
+  const [lockoutMinutes, setLockoutMinutes] = useState<number>(10);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+
+  const checkBiometricSupport = React.useCallback(async (): Promise<void> => {
+    const biometricEnabledSetting = await getSetting("biometrics_enabled");
+    const biometricEnabled = biometricEnabledSetting !== "false";
+    const maxAttemptsSetting = Number((await getSetting("max_failed_attempts")) ?? String(MAX_ATTEMPTS));
+    const lockoutSetting = Number((await getSetting("lockout_minutes")) ?? "10");
+
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    const supported = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    const primaryType = supported[0];
+
+    let label = "Biometric";
+    if (primaryType === LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION) {
+      label = "Face ID";
+    } else if (primaryType === LocalAuthentication.AuthenticationType.FINGERPRINT) {
+      label = "Fingerprint";
+    } else if (primaryType === LocalAuthentication.AuthenticationType.IRIS) {
+      label = "Iris";
+    }
+
+    setBiometricLabel(label);
+    setIsBiometricEnabled(biometricEnabled);
+    setIsBiometricAvailable(biometricEnabled && hasHardware && isEnrolled);
+    const normalizedMaxAttempts = Number.isFinite(maxAttemptsSetting)
+      ? Math.max(1, maxAttemptsSetting)
+      : MAX_ATTEMPTS;
+    setMaxAttempts(normalizedMaxAttempts);
+    setLockoutMinutes(Number.isFinite(lockoutSetting) ? Math.max(1, lockoutSetting) : 10);
+    setAttemptsLeft((current) => Math.min(current, normalizedMaxAttempts));
+  }, []);
 
   useEffect(() => {
-    const checkBiometricSupport = async (): Promise<void> => {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      const supported = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      const primaryType = supported[0];
-
-      let label = "Biometric";
-      if (primaryType === LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION) {
-        label = "Face ID";
-      } else if (primaryType === LocalAuthentication.AuthenticationType.FINGERPRINT) {
-        label = "Fingerprint";
-      } else if (primaryType === LocalAuthentication.AuthenticationType.IRIS) {
-        label = "Iris";
-      }
-
-      setBiometricLabel(label);
-      setIsBiometricAvailable(hasHardware && isEnrolled);
-    };
-
     void checkBiometricSupport();
-  }, []);
+  }, [checkBiometricSupport]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void checkBiometricSupport();
+    }, [checkBiometricSupport]),
+  );
+
+  useEffect(() => {
+    if (!lockedUntil) {
+      return;
+    }
+    const timer = setInterval(() => {
+      if (Date.now() >= lockedUntil) {
+        setLockedUntil(null);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockedUntil]);
 
   const keypadRows = useMemo(
     () => [
@@ -57,11 +94,21 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   );
 
   const onAuthSuccess = (): void => {
+    if (!hasSessionKey()) {
+      navigation.replace("MasterPassword");
+      return;
+    }
     navigation.replace("Home");
   };
 
   const consumeAttempt = (): void => {
-    setAttemptsLeft((current) => Math.max(0, current - 1));
+    setAttemptsLeft((current) => {
+      const next = Math.max(0, current - 1);
+      if (next === 0) {
+        setLockedUntil(Date.now() + lockoutMinutes * 60 * 1000);
+      }
+      return next;
+    });
   };
 
   const handleBiometricUnlock = async (): Promise<void> => {
@@ -103,8 +150,10 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     Alert.alert("Incorrect PIN", "Please try again or use your master password.");
   };
 
+  const isCurrentlyLocked = lockedUntil !== null && Date.now() < lockedUntil;
+
   const handleDigitPress = (digit: string): void => {
-    if (pin.length >= 4 || attemptsLeft <= 0) {
+    if (pin.length >= 4 || attemptsLeft <= 0 || isCurrentlyLocked) {
       return;
     }
 
@@ -141,7 +190,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
         <Text style={styles.title}>VaultKey</Text>
         <Text style={styles.subtitle}>Premium Password Manager</Text>
 
-        {attemptsLeft < MAX_ATTEMPTS ? (
+        {attemptsLeft < maxAttempts ? (
           <View style={styles.attemptBox}>
             <Text style={styles.attemptText}>
               Attempts remaining: <Text style={styles.attemptStrong}>{attemptsLeft}</Text>
@@ -149,12 +198,25 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
           </View>
         ) : null}
 
-        {attemptsLeft <= 0 ? (
+        {attemptsLeft <= 0 || isCurrentlyLocked ? (
           <View style={styles.blockedContainer}>
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>Too many attempts. Please try again later.</Text>
+              <Text style={styles.errorText}>
+                Too many attempts.
+                {lockedUntil && Date.now() < lockedUntil
+                  ? ` Try again in ${Math.ceil((lockedUntil - Date.now()) / 60000)} minute(s).`
+                  : " Please try again."}
+              </Text>
             </View>
-            <Pressable style={styles.resetButton} onPress={() => setAttemptsLeft(MAX_ATTEMPTS)}>
+            <Pressable
+              style={styles.resetButton}
+              onPress={() => {
+                if (!lockedUntil || Date.now() >= lockedUntil) {
+                  setAttemptsLeft(maxAttempts);
+                  setLockedUntil(null);
+                }
+              }}
+            >
               <Text style={styles.resetButtonText}>Reset</Text>
             </Pressable>
           </View>
@@ -170,7 +232,11 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
                   {isAuthenticating ? "Authenticating..." : `Unlock with ${biometricLabel}`}
                 </Text>
               </Pressable>
-            ) : null}
+            ) : isBiometricEnabled ? null : (
+              <View style={styles.biometricOffBox}>
+                <Text style={styles.biometricOffText}>Biometric unlock is disabled in settings.</Text>
+              </View>
+            )}
 
             <View style={styles.pinSection}>
               <Text style={styles.pinHint}>Or enter your PIN (1234)</Text>
@@ -211,6 +277,10 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </Pressable>
               ) : null}
+
+              <Pressable style={styles.masterPasswordButton} onPress={() => navigation.navigate("MasterPassword")}>
+                <Text style={styles.masterPasswordButtonText}>Use Master Password Instead</Text>
+              </Pressable>
             </View>
           </>
         )}
@@ -358,6 +428,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  biometricOffBox: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.4)",
+    backgroundColor: "rgba(148,163,184,0.12)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  biometricOffText: {
+    color: "#A5B4D6",
+    fontSize: 12,
+    textAlign: "center",
+  },
   pinSection: {
     width: "100%",
     maxWidth: 360,
@@ -424,5 +510,15 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: "#8B94A8",
     fontSize: 14,
+  },
+  masterPasswordButton: {
+    marginTop: 4,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  masterPasswordButtonText: {
+    color: "#5B8DEF",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

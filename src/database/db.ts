@@ -193,6 +193,96 @@ export async function getVaultById(id: number): Promise<VaultRow | null> {
   return row ?? null;
 }
 
+export type UpdateVaultInput = {
+  id: number;
+  siteName: string;
+  url: string | null;
+  username: string;
+  encryptedPassword: string;
+  category: string | null;
+  notes: string | null;
+  tags: string | null;
+  strengthScore: number | null;
+  totpSecret: string | null;
+};
+
+export async function updateVault(input: UpdateVaultInput): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `
+      UPDATE vaults
+      SET
+        site_name = ?,
+        url = ?,
+        username = ?,
+        encrypted_password = ?,
+        category = ?,
+        notes = ?,
+        tags = ?,
+        strength_score = ?,
+        totp_secret = ?,
+        updated_at = ?
+      WHERE id = ?;
+    `,
+    [
+      input.siteName,
+      input.url,
+      input.username,
+      input.encryptedPassword,
+      input.category,
+      input.notes,
+      input.tags,
+      input.strengthScore,
+      input.totpSecret,
+      new Date().toISOString(),
+      input.id,
+    ],
+  );
+}
+
+export async function deleteVault(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `
+      DELETE FROM vaults
+      WHERE id = ?;
+    `,
+    [id],
+  );
+}
+
+export async function clearVaults(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `
+      DELETE FROM vaults;
+    `,
+    [],
+  );
+}
+
+export async function clearSettingsExcept(keysToKeep: string[]): Promise<void> {
+  const db = await getDatabase();
+  if (keysToKeep.length === 0) {
+    await db.runAsync(
+      `
+        DELETE FROM settings;
+      `,
+      [],
+    );
+    return;
+  }
+
+  const placeholders = keysToKeep.map(() => "?").join(", ");
+  await db.runAsync(
+    `
+      DELETE FROM settings
+      WHERE key NOT IN (${placeholders});
+    `,
+    keysToKeep,
+  );
+}
+
 export async function upsertSetting(key: string, value: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
