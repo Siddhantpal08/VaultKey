@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 // @ts-ignore noble resolution
-import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
+import { pbkdf2Async } from "@noble/hashes/pbkdf2.js";
 // @ts-ignore noble resolution
 import { sha256 } from "@noble/hashes/sha2.js";
 // @ts-ignore noble resolution
@@ -30,14 +30,14 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return res === 0;
 }
 
-function deriveKey(password: string, saltB64: string, iterations: number): Uint8Array {
+async function deriveKey(password: string, saltB64: string, iterations: number): Promise<Uint8Array> {
   const salt = Buffer.from(saltB64, "base64");
-  return pbkdf2(sha256, password, salt, { c: iterations, dkLen: KEY_BYTES });
+  return pbkdf2Async(sha256, password, salt, { c: iterations, dkLen: KEY_BYTES });
 }
 
-export function createMasterMeta(password: string): string {
+export async function createMasterMeta(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS, dkLen: KEY_BYTES });
+  const key = await pbkdf2Async(sha256, password, salt, { c: PBKDF2_ITERATIONS, dkLen: KEY_BYTES });
   const payload: MasterMeta = {
     v: MASTER_META_VERSION,
     saltB64: Buffer.from(salt).toString("base64"),
@@ -47,13 +47,13 @@ export function createMasterMeta(password: string): string {
   return JSON.stringify(payload);
 }
 
-export function verifyMasterPassword(password: string, masterMetaJson: string): boolean {
+export async function verifyMasterPassword(password: string, masterMetaJson: string): Promise<boolean> {
   try {
     const parsed = JSON.parse(masterMetaJson) as MasterMeta;
     if (parsed.v !== MASTER_META_VERSION) {
       return false;
     }
-    const candidate = deriveKey(password, parsed.saltB64, parsed.iterations);
+    const candidate = await deriveKey(password, parsed.saltB64, parsed.iterations);
     const expected = Buffer.from(parsed.hashB64, "base64");
     if (candidate.length !== expected.length) {
       return false;
@@ -64,10 +64,10 @@ export function verifyMasterPassword(password: string, masterMetaJson: string): 
   }
 }
 
-export function setSessionFromMaster(password: string, masterMetaJson: string): boolean {
+export async function setSessionFromMaster(password: string, masterMetaJson: string): Promise<boolean> {
   try {
     const parsed = JSON.parse(masterMetaJson) as MasterMeta;
-    const key = deriveKey(password, parsed.saltB64, parsed.iterations);
+    const key = await deriveKey(password, parsed.saltB64, parsed.iterations);
     sessionKeyB64 = Buffer.from(key).toString("base64");
     return true;
   } catch {

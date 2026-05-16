@@ -6,11 +6,12 @@ import {
   Alert,
   Animated,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getPINHash, getSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { hasSessionKey } from "../security/crypto";

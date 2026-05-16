@@ -305,25 +305,25 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
       setChangingMaster(true);
       const existingMeta = await getSetting(MASTER_PASSWORD_META_KEY);
       const existingLegacy = await getSetting(MASTER_PASSWORD_KEY);
-      const matchesMeta = !!existingMeta && verifyMasterPassword(currentMaster, existingMeta);
+      const matchesMeta = !!existingMeta && (await verifyMasterPassword(currentMaster, existingMeta));
       const matchesLegacy = !!existingLegacy && existingLegacy === currentMaster;
       if (!matchesMeta && !matchesLegacy) {
         toast.show("Current master password is incorrect.", "error"); return;
       }
 
       if (!hasSessionKey()) {
-        if (existingMeta) setSessionFromMaster(currentMaster, existingMeta);
+        if (existingMeta) await setSessionFromMaster(currentMaster, existingMeta);
         else { toast.show("Please unlock with master password first.", "error"); return; }
       }
 
-      const nextMeta = createMasterMeta(newMaster);
+      const nextMeta = await createMasterMeta(newMaster);
       const rows = await getVaults();
       const decryptedRows = rows.map((row) => ({
         row,
         plainPassword: decryptWithSession(row.encrypted_password),
       }));
 
-      setSessionFromMaster(newMaster, nextMeta);
+      await setSessionFromMaster(newMaster, nextMeta);
       for (const item of decryptedRows) {
         await updateVault({
           id: item.row.id, siteName: item.row.site_name, url: item.row.url,
@@ -335,7 +335,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
 
       await upsertSetting(MASTER_PASSWORD_META_KEY, nextMeta);
       await upsertSetting(MASTER_PASSWORD_KEY, "");
-      setSessionFromMaster(newMaster, nextMeta);
+      await setSessionFromMaster(newMaster, nextMeta);
       setCurrentMaster(""); setNewMaster(""); setConfirmMaster("");
       toast.show("Master password changed ✓", "success");
     } catch {

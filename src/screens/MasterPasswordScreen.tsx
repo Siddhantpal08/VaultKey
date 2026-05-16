@@ -4,12 +4,12 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { createMasterMeta, setSessionFromMaster, verifyMasterPassword } from "../security/crypto";
@@ -89,14 +89,14 @@ export default function MasterPasswordScreen({
       setIsSubmitting(true);
       setError("");
       if (isSetupMode) {
-        const meta = createMasterMeta(password);
+        const meta = await createMasterMeta(password);
         await upsertSetting(MASTER_PASSWORD_META_KEY, meta);
         await upsertSetting(MASTER_PASSWORD_KEY, "");
-        setSessionFromMaster(password, meta);
+        await setSessionFromMaster(password, meta);
       } else {
         const existingMeta = masterMeta ?? (await getSetting(MASTER_PASSWORD_META_KEY));
         const existingLegacy = await getSetting(MASTER_PASSWORD_KEY);
-        const matchesMeta = !!existingMeta && verifyMasterPassword(password, existingMeta);
+        const matchesMeta = !!existingMeta && (await verifyMasterPassword(password, existingMeta));
         const matchesLegacy = !!existingLegacy && existingLegacy === password;
 
         if (!matchesMeta && !matchesLegacy) {
@@ -105,20 +105,21 @@ export default function MasterPasswordScreen({
         }
 
         if (matchesLegacy && !existingMeta) {
-          const migrated = createMasterMeta(password);
+          const migrated = await createMasterMeta(password);
           await upsertSetting(MASTER_PASSWORD_META_KEY, migrated);
           await upsertSetting(MASTER_PASSWORD_KEY, "");
           setMasterMeta(migrated);
-          setSessionFromMaster(password, migrated);
+          await setSessionFromMaster(password, migrated);
         } else if (existingMeta) {
-          setSessionFromMaster(password, existingMeta);
+          await setSessionFromMaster(password, existingMeta);
         }
       }
       navigation.reset({
         index: 0,
         routes: [{ name: "Home" }],
       });
-    } catch {
+    } catch (e) {
+      console.error("MasterPassword save error:", e);
       Alert.alert("Something went wrong", "Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -204,7 +205,7 @@ export default function MasterPasswordScreen({
           </Text>
         </Pressable>
 
-        <Pressable style={styles.secondaryButton} onPress={() => navigation.goBack()}>
+        <Pressable style={styles.secondaryButton} onPress={() => navigation.replace("Lock")}>
           <Text style={styles.secondaryButtonText}>← Back to Lock Screen</Text>
         </Pressable>
 
