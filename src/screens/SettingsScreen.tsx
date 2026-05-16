@@ -36,7 +36,8 @@ import {
   setSessionFromMaster,
   verifyMasterPassword,
 } from "../security/crypto";
-import { createHash } from "react-native-quick-crypto";
+// @ts-ignore noble hashes resolution
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Buffer } from "buffer";
 import { Colors } from "../theme/colors";
 import { BottomTabBar } from "../components/BottomTabBar";
@@ -67,9 +68,8 @@ const MASTER_PASSWORD_KEY = "master_password";
 const MASTER_PASSWORD_META_KEY = "master_password_meta";
 
 function hashPIN(pin: string): string {
-  return createHash("sha256")
-    .update(Buffer.from(pin, "utf8"))
-    .digest("base64") as string;
+  const hash = sha256(Buffer.from(pin, "utf8"));
+  return Buffer.from(hash).toString("base64");
 }
 
 function boolToString(value: boolean): string {

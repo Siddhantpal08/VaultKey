@@ -1,10 +1,12 @@
 /**
  * RFC 6238 TOTP / RFC 4226 HOTP implementation.
- * Uses react-native-quick-crypto for HMAC-SHA1 (already installed).
- * No additional npm dependencies required.
+ * Uses @noble/hashes for HMAC-SHA1.
  */
 
-import { createHmac } from "react-native-quick-crypto";
+// @ts-ignore noble resolution
+import { hmac } from "@noble/hashes/hmac.js";
+// @ts-ignore noble resolution
+import { sha1 } from "@noble/hashes/legacy.js";
 import { Buffer } from "buffer";
 
 const STEP_SECONDS = 30;
@@ -41,8 +43,8 @@ function hotp(keyBytes: Buffer, counter: number): string {
   msg.writeUInt32BE(hi, 0);
   msg.writeUInt32BE(lo, 4);
 
-  const mac = createHmac("sha1", keyBytes).update(msg).digest();
-  const hmacBuf = Buffer.from(mac as unknown as ArrayBuffer);
+  const mac = hmac(sha1, keyBytes, msg);
+  const hmacBuf = Buffer.from(mac);
 
   const offset = hmacBuf[hmacBuf.length - 1] & 0x0f;
   const code =

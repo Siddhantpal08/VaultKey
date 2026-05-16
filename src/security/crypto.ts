@@ -1,17 +1,16 @@
 import { Buffer } from "buffer";
-import {
-  createCipheriv,
-  createDecipheriv,
-  pbkdf2Sync,
-  randomBytes,
-  timingSafeEqual,
-} from "react-native-quick-crypto";
+// @ts-ignore noble resolution
+import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
+// @ts-ignore noble resolution
+import { sha256 } from "@noble/hashes/sha2.js";
+// @ts-ignore noble resolution
+import { randomBytes } from "@noble/hashes/utils.js";
+// @ts-ignore noble resolution
+import { gcm } from "@noble/ciphers/aes.js";
 
 const MASTER_META_VERSION = 1;
 const PBKDF2_ITERATIONS = 210000;
 const KEY_BYTES = 32;
-const DIGEST = "sha256";
-const ALGO = "aes-256-gcm";
 
 type MasterMeta = {
   v: number;
@@ -22,20 +21,27 @@ type MasterMeta = {
 
 let sessionKeyB64: string | null = null;
 
-function deriveKey(password: string, saltB64: string, iterations: number): Buffer {
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let res = 0;
+  for (let i = 0; i < a.length; i++) {
+    res |= a[i] ^ b[i];
+  }
+  return res === 0;
+}
+
+function deriveKey(password: string, saltB64: string, iterations: number): Uint8Array {
   const salt = Buffer.from(saltB64, "base64");
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error react-native-quick-crypto Buffer type mismatch
-  return pbkdf2Sync(password, salt, iterations, KEY_BYTES, DIGEST);
+  return pbkdf2(sha256, password, salt, { c: iterations, dkLen: KEY_BYTES });
 }
 
 export function createMasterMeta(password: string): string {
   const salt = randomBytes(16);
-  const key = pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_BYTES, DIGEST);
+  const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS, dkLen: KEY_BYTES });
   const payload: MasterMeta = {
     v: MASTER_META_VERSION,
-    saltB64: salt.toString("base64"),
-    hashB64: key.toString("base64"),
+    saltB64: Buffer.from(salt).toString("base64"),
+    hashB64: Buffer.from(key).toString("base64"),
     iterations: PBKDF2_ITERATIONS,
   };
   return JSON.stringify(payload);
@@ -62,7 +68,7 @@ export function setSessionFromMaster(password: string, masterMetaJson: string): 
   try {
     const parsed = JSON.parse(masterMetaJson) as MasterMeta;
     const key = deriveKey(password, parsed.saltB64, parsed.iterations);
-    sessionKeyB64 = key.toString("base64");
+    sessionKeyB64 = Buffer.from(key).toString("base64");
     return true;
   } catch {
     return false;
@@ -77,7 +83,7 @@ export function clearSessionKey(): void {
   sessionKeyB64 = null;
 }
 
-function getSessionKey(): Buffer {
+function getSessionKey(): Uint8Array {
   if (!sessionKeyB64) {
     throw new Error("Vault session is not unlocked.");
   }
@@ -87,10 +93,14 @@ function getSessionKey(): Buffer {
 export function encryptWithSession(plainText: string): string {
   const key = getSessionKey();
   const iv = randomBytes(12);
-  const cipher = createCipheriv(ALGO, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `v1:${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`;
+  const aes = gcm(key, iv);
+  
+  const fullCiphertext = aes.encrypt(Buffer.from(plainText, "utf8"));
+  
+  const encrypted = fullCiphertext.subarray(0, fullCiphertext.length - 16);
+  const authTag = fullCiphertext.subarray(fullCiphertext.length - 16);
+  
+  return `v1:${Buffer.from(iv).toString("base64")}:${Buffer.from(authTag).toString("base64")}:${Buffer.from(encrypted).toString("base64")}`;
 }
 
 export function decryptWithSession(cipherText: string): string {
@@ -104,12 +114,17 @@ export function decryptWithSession(cipherText: string): string {
   if (parts.length !== 4) {
     throw new Error("Invalid ciphertext format.");
   }
+  
   const iv = Buffer.from(parts[1], "base64");
   const authTag = Buffer.from(parts[2], "base64");
   const encrypted = Buffer.from(parts[3], "base64");
-  const decipher = createDecipheriv(ALGO, key, iv);
-  // @ts-ignore react-native-quick-crypto Buffer<ArrayBuffer> vs Buffer type mismatch
-  decipher.setAuthTag(authTag);
-  const plain = Buffer.concat([decipher.update(encrypted) as unknown as Uint8Array, decipher.final() as unknown as Uint8Array]);
-  return plain.toString("utf8");
+  
+  const aes = gcm(key, iv);
+  
+  const fullCiphertext = new Uint8Array(encrypted.length + authTag.length);
+  fullCiphertext.set(encrypted, 0);
+  fullCiphertext.set(authTag, encrypted.length);
+  
+  const plainBytes = aes.decrypt(fullCiphertext);
+  return Buffer.from(plainBytes).toString("utf8");
 }

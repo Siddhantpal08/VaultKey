@@ -15,7 +15,8 @@ import { getPINHash, getSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { hasSessionKey } from "../security/crypto";
 import { Colors } from "../theme/colors";
-import { createHash } from "react-native-quick-crypto";
+// @ts-ignore noble hashes resolution
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Buffer } from "buffer";
 
 type LockScreenProps = StackScreenProps<RootStackParamList, "Lock">;
@@ -23,9 +24,8 @@ type LockScreenProps = StackScreenProps<RootStackParamList, "Lock">;
 const MAX_ATTEMPTS = 5;
 
 function hashPIN(pin: string): string {
-  return createHash("sha256")
-    .update(Buffer.from(pin, "utf8"))
-    .digest("base64") as string;
+  const hash = sha256(Buffer.from(pin, "utf8"));
+  return Buffer.from(hash).toString("base64");
 }
 
 export default function LockScreen({ navigation }: LockScreenProps): React.JSX.Element {
