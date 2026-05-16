@@ -5,18 +5,20 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getVaults, toggleFavourite, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { Colors } from "../theme/colors";
 import { SiteIcon } from "../components/SiteIcon";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
+import { SetupPINModal } from "../components/SetupPINModal";
+import { Ionicons } from "@expo/vector-icons";
 
 type HomeScreenProps = StackScreenProps<RootStackParamList, "Home">;
 type SortMode = "recent" | "name" | "strength";
@@ -32,9 +34,10 @@ function StrengthRing({ score }: { score: number }): React.JSX.Element {
   );
 }
 
-export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.Element {
+export default function HomeScreen({ navigation, route }: HomeScreenProps): React.JSX.Element {
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [vaults, setVaults] = React.useState<VaultRow[]>([]);
+  const [showPINSetup, setShowPINSetup] = React.useState(!!route.params?.showPINSetup);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [sortMode, setSortMode] = React.useState<SortMode>("recent");
@@ -97,7 +100,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
     setVaults((current) =>
       current.map((v) => (v.id === item.id ? { ...v, favourite: newVal } : v)),
     );
-    toast.show(newVal === 1 ? "Added to starred ⭐" : "Removed from starred", newVal === 1 ? "success" : "info");
+    toast.show(newVal === 1 ? "Added to starred" : "Removed from starred", newVal === 1 ? "success" : "info");
   };
 
   const renderSortButton = (mode: SortMode, label: string): React.JSX.Element => (
@@ -136,11 +139,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
                   onPress={() => navigation.navigate("Generator")}
                 >
                   <Text style={styles.healthActionText}>
-                    ⚠ {totalWeak} weak — fix now
+                    <Ionicons name="warning" size={12} color={Colors.warning} /> {totalWeak} weak — fix now
                   </Text>
                 </Pressable>
               ) : (
-                <Text style={styles.healthGood}>✓ All passwords are strong!</Text>
+                <Text style={styles.healthGood}>
+                  <Ionicons name="checkmark-circle" size={12} color={Colors.success} /> All passwords are strong!
+                </Text>
               )}
             </View>
             <View style={styles.healthRingWrap}>
@@ -163,7 +168,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
           </View>
         ) : (
           <View style={styles.emptyHero}>
-            <Text style={styles.emptyHeroEmoji}>🔐</Text>
+            <Ionicons name="lock-closed" size={40} color={Colors.accent} style={styles.emptyHeroEmoji} />
             <Text style={styles.emptyHeroTitle}>Start building your vault</Text>
             <Text style={styles.emptyHeroSub}>
               All passwords are encrypted on-device. Nothing leaves your phone.
@@ -172,7 +177,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
               style={styles.emptyHeroCTA}
               onPress={() => navigation.navigate("AddPassword")}
             >
-              <Text style={styles.emptyHeroCTAText}>+ Add your first password</Text>
+              <Text style={styles.emptyHeroCTAText}>
+                <Ionicons name="add" size={14} color={Colors.textPrimary} /> Add your first password
+              </Text>
             </Pressable>
           </View>
         )}
@@ -189,7 +196,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
         {/* Category chips */}
         <FlatList
           data={[
-            { key: "all", value: null as string | null, label: `All (${vaults.length})` },
+            { key: "all", value: null as string | null, label: "All" },
             ...categories.map((category) => ({
               key: category,
               value: category,
@@ -198,6 +205,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
           ]}
           horizontal
           keyExtractor={(item) => item.key}
+          style={{ flexGrow: 0, maxHeight: 45, minHeight: 45 }}
           contentContainerStyle={styles.categoryList}
           showsHorizontalScrollIndicator={false}
           renderItem={({ item }) => (
@@ -268,7 +276,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
                       hitSlop={10}
                       style={styles.starBtn}
                     >
-                      <Text style={{ fontSize: 18, opacity: item.favourite ? 1 : 0.28 }}>⭐</Text>
+                      <Ionicons
+                        name={item.favourite ? "star" : "star-outline"}
+                        size={18}
+                        color={item.favourite ? Colors.star : Colors.textMuted}
+                      />
                     </Pressable>
                     <StrengthRing score={item.strength_score ?? 0} />
                   </View>
@@ -282,11 +294,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
       <BottomTabBar
         activeTab="Vault"
         onTabPress={(tab) => {
-          if (tab === "Favourites") navigation.navigate("Favourites");
+          if (tab === "Notes") navigation.navigate("Notes");
           else if (tab === "Generator") navigation.navigate("Generator");
           else if (tab === "Settings") navigation.navigate("Settings");
         }}
         onAddPress={() => navigation.navigate("AddPassword")}
+      />
+
+      <SetupPINModal 
+        visible={showPINSetup} 
+        onComplete={() => setShowPINSetup(false)} 
       />
     </SafeAreaView>
   );
@@ -339,7 +356,7 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 12,
   },
-  emptyHeroEmoji: { fontSize: 40, marginBottom: 10 },
+  emptyHeroEmoji: { marginBottom: 10 },
   emptyHeroTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: 6 },
   emptyHeroSub: { color: Colors.textSecondary, fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 14 },
   emptyHeroCTA: {
@@ -360,7 +377,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 14,
   },
-  categoryList: { gap: 8, paddingVertical: 6 },
+  categoryList: { gap: 8, paddingVertical: 6, alignItems: "center" },
   categoryChip: {
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -372,7 +389,7 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   categoryChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
   categoryChipTextActive: { color: Colors.textPrimary },
-  sortRow: { flexDirection: "row", gap: 8, marginVertical: 8 },
+  sortRow: { flexDirection: "row", gap: 8, marginVertical: 8, alignItems: "center" },
   sortChip: {
     borderRadius: 8,
     borderWidth: 1,

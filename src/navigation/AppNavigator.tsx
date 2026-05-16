@@ -10,18 +10,26 @@ import PasswordDetailScreen from "../screens/PasswordDetailScreen";
 import GeneratorScreen from "../screens/GeneratorScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import FavouritesScreen from "../screens/FavouritesScreen";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
+import NotesScreen from "../screens/NotesScreen";
+import AddNoteScreen from "../screens/AddNoteScreen";
+import NoteDetailScreen from "../screens/NoteDetailScreen";
 import { getSetting } from "../database/db";
 import { clearSessionKey } from "../security/crypto";
 
 export type RootStackParamList = {
   Lock: undefined;
   MasterPassword: undefined;
-  Home: undefined;
+  Home: { showPINSetup?: boolean } | undefined;
   AddPassword: undefined;
   PasswordDetail: { id: number };
   Generator: undefined;
   Settings: undefined;
   Favourites: undefined;
+  ForgotPassword: undefined;
+  Notes: undefined;
+  AddNote: undefined;
+  NoteDetail: { id: number };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -83,7 +91,21 @@ export default function AppNavigator(): React.JSX.Element {
         initialRouteName="Lock"
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: "#0B1020" },
+          cardStyle: { backgroundColor: "#060B17" },
+          gestureEnabled: true,
+          cardStyleInterpolator: ({ current, layouts }) => ({
+            cardStyle: {
+              opacity: current.progress,
+              transform: [
+                {
+                  translateX: current.progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [layouts.screen.width * 0.2, 0],
+                  }),
+                },
+              ],
+            },
+          }),
         }}
       >
         <Stack.Screen name="Lock" component={LockScreen} />
@@ -94,6 +116,10 @@ export default function AppNavigator(): React.JSX.Element {
         <Stack.Screen name="PasswordDetail" component={PasswordDetailScreen} />
         <Stack.Screen name="Generator" component={GeneratorScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="Notes" component={NotesScreen} />
+        <Stack.Screen name="AddNote" component={AddNoteScreen} />
+        <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

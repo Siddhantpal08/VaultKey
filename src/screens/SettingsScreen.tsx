@@ -7,13 +7,13 @@ import { StackScreenProps } from "@react-navigation/stack";
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   clearSettingsExcept,
   clearVaults,
@@ -42,6 +42,7 @@ import { Buffer } from "buffer";
 import { Colors } from "../theme/colors";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
+import { Ionicons } from "@expo/vector-icons";
 
 type SettingsScreenProps = StackScreenProps<RootStackParamList, "Settings">;
 
@@ -195,7 +196,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
       await writeAsStringAsync(target, payload);
       Alert.alert(
         "Export complete",
-        `⚠️ The export includes encrypted passwords — they can only be decrypted with your master password.\n\nSaved to:\n${target}`,
+        `The export includes encrypted passwords — they can only be decrypted with your master password.\n\nSaved to:\n${target}`,
       );
     } catch {
       toast.show("Export failed.", "error");
@@ -270,7 +271,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
                 username: row.username, encrypted_password: row.encrypted_password,
                 category: row.category, notes: row.notes, tags: row.tags,
                 strength_score: row.strength_score, totp_secret: row.totp_secret,
-                favourite: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+                favourite: 0, is_note: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
               });
             }
           }
@@ -359,11 +360,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>⚙ Settings</Text>
+        <Text style={styles.title}><Ionicons name="settings" size={24} /> Settings</Text>
         <Text style={styles.subtitle}>Security and backup preferences for your vault.</Text>
 
         {/* Security toggles */}
-        <SectionCard title="🔒 Security">
+        <SectionCard title="Security" icon="lock-closed">
           <ToggleRow
             label="Enable biometrics"
             sub="Face ID / Fingerprint unlock"
@@ -386,7 +387,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* Auto-lock timeout */}
-        <SectionCard title="⏱ Auto-lock Timeout">
+        <SectionCard title="Auto-lock Timeout" icon="time">
           <Text style={styles.inlineLabel}>Lock after being in background for</Text>
           <View style={styles.chipRow}>
             {[1, 5, 10, 30].map((minute) => (
@@ -404,7 +405,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* Brute-force */}
-        <SectionCard title="🛡 Brute-force Protection">
+        <SectionCard title="Brute-force Protection" icon="shield-checkmark">
           <Text style={styles.inlineLabel}>Max failed PIN attempts</Text>
           <View style={styles.chipRow}>
             {[3, 5, 8, 10].map((count) => (
@@ -436,7 +437,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* Clipboard */}
-        <SectionCard title="📋 Clipboard Safety">
+        <SectionCard title="Clipboard Safety" icon="clipboard">
           <Text style={styles.inlineLabel}>Auto-clear copied secrets after</Text>
           <View style={styles.chipRow}>
             {[15, 30, 60, 120].map((seconds) => (
@@ -454,7 +455,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* PIN management */}
-        <SectionCard title={hasPIN ? "🔢 Change PIN" : "🔢 Set Lock PIN"}>
+        <SectionCard title={hasPIN ? "Change PIN" : "Set Lock PIN"} icon="keypad">
           <Text style={styles.inlineLabel}>
             {hasPIN ? "Set a new 4-digit PIN:" : "Create a 4-digit PIN for quick lock screen access:"}
           </Text>
@@ -495,7 +496,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* Change master password */}
-        <SectionCard title="🗝 Change Master Password">
+        <SectionCard title="Change Master Password" icon="key">
           <TextInput
             style={styles.input}
             secureTextEntry
@@ -532,9 +533,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         </SectionCard>
 
         {/* Backup */}
-        <SectionCard title="💾 Backup">
+        <SectionCard title="Backup" icon="save">
           <Text style={styles.backupNote}>
-            ⚠️ Exports include encrypted passwords. They require the same master password to decrypt on import.
+            <Ionicons name="warning" size={12} /> Exports include encrypted passwords. They require the same master password to decrypt on import.
           </Text>
           <Pressable style={styles.primaryButton} onPress={() => void exportData()}>
             <Text style={styles.primaryButtonText}>Export Backup JSON</Text>
@@ -558,13 +559,21 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
             <Text style={styles.dangerButtonText}>Import (Replace All)</Text>
           </Pressable>
         </SectionCard>
+
+        <View style={sStyles.watermarkContainer}>
+          <Text style={sStyles.watermarkText}>VaultKey v1.0.0</Text>
+          <Text style={sStyles.watermarkText}>
+            Created by <Text style={sStyles.watermarkHighlight}>Siddhant Pal</Text>
+          </Text>
+          <Text style={sStyles.watermarkSub}>Provided by Crevio Studio</Text>
+        </View>
       </ScrollView>
 
       <BottomTabBar
         activeTab="Settings"
         onTabPress={(tab) => {
           if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Favourites") navigation.navigate("Favourites");
+          else if (tab === "Notes") navigation.navigate("Notes");
           else if (tab === "Generator") navigation.navigate("Generator");
         }}
         onAddPress={() => navigation.navigate("AddPassword")}
@@ -575,14 +584,18 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
 
 function SectionCard({
   title,
+  icon,
   children,
 }: {
   title: string;
+  icon?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
     <View style={sStyles.card}>
-      <Text style={sStyles.cardTitle}>{title}</Text>
+      <Text style={sStyles.cardTitle}>
+        {icon && <Ionicons name={icon as any} size={14} color={Colors.textPrimary} />} {title}
+      </Text>
       {children}
     </View>
   );
@@ -641,6 +654,29 @@ const sStyles = StyleSheet.create({
   },
   pillOn: { backgroundColor: Colors.successBg, borderColor: "rgba(34,197,94,0.3)" },
   pillText: { color: Colors.textPrimary, fontSize: 11, fontWeight: "700" },
+  watermarkContainer: {
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 40,
+    opacity: 0.8,
+  },
+  watermarkText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  watermarkHighlight: {
+    color: Colors.accent,
+    fontWeight: "700",
+  },
+  watermarkSub: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
 });
 
 const styles = StyleSheet.create({

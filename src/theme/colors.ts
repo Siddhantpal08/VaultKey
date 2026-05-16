@@ -5,11 +5,12 @@
 
 export const Colors = {
   // ─── Backgrounds ──────────────────────────────────────────────────────
-  bg: "#0B1020",
+  bg: "#060B17", // Crevio deep navy
   bgCard: "rgba(255,255,255,0.03)",
   bgCardHover: "rgba(255,255,255,0.06)",
   bgInput: "rgba(255,255,255,0.05)",
   bgSection: "rgba(255,255,255,0.04)",
+  bgGlass: "rgba(6, 11, 23, 0.7)", // For glassmorphic overlays
 
   // ─── Borders ──────────────────────────────────────────────────────────
   border: "rgba(255,255,255,0.12)",

@@ -4,19 +4,21 @@ import { StackScreenProps } from "@react-navigation/stack";
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, insertVault, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
 import { Colors } from "../theme/colors";
 import { StrengthMeter } from "../components/StrengthMeter";
 import { useToast } from "../components/Toast";
+import { Ionicons } from "@expo/vector-icons";
 
 type AddPasswordScreenProps = StackScreenProps<RootStackParamList, "AddPassword">;
 
@@ -132,8 +134,9 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.topBar}>
-          <Pressable onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>← Back</Text>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backRow}>
+            <Ionicons name="arrow-back" size={16} color={Colors.accent} />
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
         <Text style={styles.title}>Add Password</Text>
@@ -187,13 +190,17 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
           />
           <View style={styles.pwRow}>
             <Pressable style={styles.linkBtn} onPress={() => setShowPassword((v) => !v)}>
-              <Text style={styles.linkBtnText}>{showPassword ? "🙈 Hide" : "👁 Show"}</Text>
+              <Text style={styles.linkBtnText}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={14} /> {showPassword ? "Hide" : "Show"}
+              </Text>
             </Pressable>
             <Pressable
               style={styles.linkBtn}
               onPress={() => updateField("password", generateStrongPassword(16))}
             >
-              <Text style={styles.linkBtnText}>⚡ Generate strong</Text>
+              <Text style={styles.linkBtnText}>
+                <Ionicons name="flash" size={14} /> Generate strong
+              </Text>
             </Pressable>
           </View>
           <StrengthMeter score={strength} />
@@ -253,9 +260,16 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
           onPress={() => void onSave()}
           disabled={isSaving}
         >
-          <Text style={styles.primaryButtonText}>
-            {isSaving ? "Saving..." : "🔐 Save Password"}
-          </Text>
+          {isSaving ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.primaryButtonText}>Saving...</Text>
+            </View>
+          ) : (
+            <Text style={styles.primaryButtonText}>
+              <Ionicons name="save" size={16} /> Save Password
+            </Text>
+          )}
         </Pressable>
 
         <Pressable style={styles.secondaryButton} onPress={() => navigation.goBack()}>
@@ -279,6 +293,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingBottom: 28, paddingTop: 6 },
   topBar: { marginBottom: 8 },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   backText: { color: Colors.accent, fontWeight: "700", fontSize: 14 },
   title: { color: Colors.textPrimary, fontSize: 26, fontWeight: "700", marginBottom: 4 },
   subtitle: { color: Colors.textSecondary, fontSize: 12, marginBottom: 18, lineHeight: 18 },

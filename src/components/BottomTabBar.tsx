@@ -1,8 +1,9 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 
-export type TabName = "Vault" | "Favourites" | "Generator" | "Settings";
+export type TabName = "Vault" | "Notes" | "Generator" | "Settings";
 
 type Tab = {
   name: TabName;
@@ -11,10 +12,10 @@ type Tab = {
 };
 
 const TABS: Tab[] = [
-  { name: "Vault", icon: "🔐", label: "Vault" },
-  { name: "Favourites", icon: "⭐", label: "Starred" },
-  { name: "Generator", icon: "⚡", label: "Generate" },
-  { name: "Settings", icon: "⚙", label: "Settings" },
+  { name: "Vault", icon: "shield-checkmark", label: "Vault" },
+  { name: "Notes", icon: "document-text", label: "Notes" },
+  { name: "Generator", icon: "flash", label: "Generate" },
+  { name: "Settings", icon: "settings", label: "Settings" },
 ];
 
 type BottomTabBarProps = {
@@ -28,11 +29,11 @@ export function BottomTabBar({ activeTab, onTabPress, onAddPress }: BottomTabBar
     <View style={styles.wrapper}>
       {/* Floating Add button — sits above the tab bar */}
       <Pressable style={styles.fab} onPress={onAddPress}>
-        <Text style={styles.fabIcon}>+</Text>
+        <Ionicons name="add" size={28} color="#FFFFFF" style={styles.fabIcon} />
       </Pressable>
 
       <View style={styles.bar}>
-        {TABS.map((tab) => {
+        {TABS.slice(0, 2).map((tab) => {
           const isActive = tab.name === activeTab;
           return (
             <Pressable
@@ -41,7 +42,35 @@ export function BottomTabBar({ activeTab, onTabPress, onAddPress }: BottomTabBar
               onPress={() => onTabPress(tab.name)}
             >
               <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
+                <Ionicons
+                  name={tab.icon as any}
+                  size={20}
+                  color={isActive ? Colors.tabActive : Colors.tabInactive}
+                  style={[styles.tabIcon, isActive && styles.tabIconActive]}
+                />
+              </View>
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <View style={{ flex: 1 }} />
+        {TABS.slice(2, 4).map((tab) => {
+          const isActive = tab.name === activeTab;
+          return (
+            <Pressable
+              key={tab.name}
+              style={styles.tabItem}
+              onPress={() => onTabPress(tab.name)}
+            >
+              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                <Ionicons
+                  name={tab.icon as any}
+                  size={20}
+                  color={isActive ? Colors.tabActive : Colors.tabInactive}
+                  style={[styles.tabIcon, isActive && styles.tabIconActive]}
+                />
               </View>
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                 {tab.label}
@@ -84,8 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentBg,
   },
   tabIcon: {
-    fontSize: 20,
-    opacity: 0.45,
+    opacity: 0.8,
   },
   tabIconActive: {
     opacity: 1,
@@ -116,9 +144,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   fabIcon: {
-    color: "#FFFFFF",
-    fontSize: 28,
-    fontWeight: "300",
-    lineHeight: 32,
+    lineHeight: 28,
   },
 });

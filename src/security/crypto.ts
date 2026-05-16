@@ -9,7 +9,7 @@ import { randomBytes } from "@noble/hashes/utils.js";
 import { gcm } from "@noble/ciphers/aes.js";
 
 const MASTER_META_VERSION = 1;
-const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_ITERATIONS = 50000;
 const KEY_BYTES = 32;
 
 type MasterMeta = {

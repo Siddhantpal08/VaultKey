@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
@@ -114,9 +115,12 @@ export default function MasterPasswordScreen({
           await setSessionFromMaster(password, existingMeta);
         }
       }
+      
+      const pinHash = await getSetting("pin_hash");
+
       navigation.reset({
         index: 0,
-        routes: [{ name: "Home" }],
+        routes: [{ name: "Home", params: { showPINSetup: !pinHash } }],
       });
     } catch (e) {
       console.error("MasterPassword save error:", e);
@@ -141,7 +145,11 @@ export default function MasterPasswordScreen({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerIcon}>
-          <Text style={styles.headerEmoji}>{isSetupMode ? "🛡️" : "🔑"}</Text>
+          <Ionicons 
+            name={isSetupMode ? "shield-checkmark" : "key"} 
+            size={30} 
+            color={Colors.accent} 
+          />
         </View>
         <Text style={styles.title}>
           {isSetupMode ? "Create Master Password" : "Verify Identity"}
@@ -183,7 +191,9 @@ export default function MasterPasswordScreen({
           ) : null}
 
           <Pressable style={styles.showToggle} onPress={() => setShowPassword((v) => !v)}>
-            <Text style={styles.showToggleText}>{showPassword ? "🙈 Hide" : "👁 Show"} password</Text>
+            <Text style={styles.showToggleText}>
+              <Ionicons name={showPassword ? "eye-off" : "eye"} size={12} /> {showPassword ? "Hide" : "Show"} password
+            </Text>
           </Pressable>
 
           {password.length > 0 && isSetupMode ? (
@@ -200,10 +210,23 @@ export default function MasterPasswordScreen({
           onPress={() => void onContinue()}
           disabled={isSubmitting}
         >
-          <Text style={styles.primaryButtonText}>
-            {isSubmitting ? "Please wait..." : isSetupMode ? "Save & Continue" : "Unlock Vault"}
-          </Text>
+          {isSubmitting ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.primaryButtonText}>Please wait...</Text>
+            </View>
+          ) : (
+            <Text style={styles.primaryButtonText}>
+              {isSetupMode ? "Save & Continue" : "Unlock Vault"}
+            </Text>
+          )}
         </Pressable>
+
+        {!isSetupMode && (
+          <Pressable style={styles.forgotBtn} onPress={() => navigation.navigate("ForgotPassword")}>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </Pressable>
+        )}
 
         <Pressable style={styles.secondaryButton} onPress={() => navigation.replace("Lock")}>
           <Text style={styles.secondaryButtonText}>← Back to Lock Screen</Text>
@@ -211,9 +234,17 @@ export default function MasterPasswordScreen({
 
         {isSetupMode ? (
           <Text style={styles.hint}>
-            ⚠️ There is no password recovery. Store it safely.
+            <Ionicons name="warning" size={12} /> There is no password recovery. Store it safely.
           </Text>
         ) : null}
+
+        <View style={styles.watermarkContainer}>
+          <Text style={styles.watermarkText}>VaultKey</Text>
+          <Text style={styles.watermarkText}>
+            Created by <Text style={styles.watermarkHighlight}>Siddhant Pal</Text>
+          </Text>
+          <Text style={styles.watermarkSub}>Provided by Crevio Studio</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -239,7 +270,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 20,
   },
-  headerEmoji: { fontSize: 30 },
   title: {
     fontSize: 26,
     fontWeight: "700",
@@ -291,7 +321,40 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   primaryButtonDisabled: { opacity: 0.7 },
-  primaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700" },
+  primaryButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  forgotBtn: {
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  forgotText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    textDecorationLine: "underline",
+  },
+  footerLink: { color: Colors.textMuted, fontSize: 13, textDecorationLine: "underline" },
+  watermarkContainer: {
+    alignItems: "center",
+    marginTop: 40,
+    opacity: 0.6,
+  },
+  watermarkText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  watermarkHighlight: {
+    color: Colors.accent,
+    fontWeight: "700",
+  },
+  watermarkSub: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   secondaryButton: { alignItems: "center", paddingVertical: 12 },
   secondaryButtonText: { color: Colors.textSecondary, fontSize: 14 },
   hint: {

@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getPINHash, getSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
@@ -220,7 +221,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
         <View style={styles.iconWrapper}>
           <Animated.View style={[styles.iconRing, { transform: [{ scale: pulseAnim }] }]} />
           <View style={styles.iconCircle}>
-            <Text style={styles.iconGlyph}>🔐</Text>
+            <Ionicons name="lock-closed" size={40} color={Colors.accent} />
           </View>
         </View>
 
@@ -265,9 +266,11 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
                 onPress={() => void handleBiometricUnlock()}
                 disabled={isAuthenticating}
               >
-                <Text style={styles.biometricIcon}>
-                  {biometricLabel === "Face ID" ? "🪪" : "👆"}
-                </Text>
+                <Ionicons 
+                  name={biometricLabel === "Face ID" ? "scan" : "finger-print"} 
+                  size={20} 
+                  color={Colors.textPrimary} 
+                />
                 <Text style={styles.biometricButtonText}>
                   {isAuthenticating ? "Authenticating..." : `Unlock with ${biometricLabel}`}
                 </Text>
@@ -322,7 +325,9 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
 
                   {pin.length > 0 ? (
                     <Pressable style={styles.deleteButton} onPress={handleBackspace}>
-                      <Text style={styles.deleteButtonText}>⌫  Delete</Text>
+                      <Text style={styles.deleteButtonText}>
+                        <Ionicons name="backspace" size={14} /> Delete
+                      </Text>
                     </Pressable>
                   ) : null}
                 </>
@@ -395,9 +400,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(91,141,239,0.4)",
   },
-  iconGlyph: {
-    fontSize: 40,
-  },
   iconRing: {
     position: "absolute",
     width: 106,
@@ -463,7 +465,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   biometricDisabled: { opacity: 0.5 },
-  biometricIcon: { fontSize: 20 },
   biometricButtonText: { color: Colors.textPrimary, fontSize: 15, fontWeight: "600" },
   biometricOffBox: {
     width: "100%",

@@ -14,6 +14,7 @@ export type VaultRow = {
   strength_score: number | null;
   totp_secret: string | null;
   favourite: number; // 0 | 1
+  is_note: number; // 0 | 1
   created_at: string;
   updated_at: string;
 };
@@ -53,6 +54,7 @@ export async function initializeDatabase(): Promise<void> {
         strength_score INTEGER,
         totp_secret TEXT,
         favourite INTEGER NOT NULL DEFAULT 0,
+        is_note INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
@@ -63,9 +65,10 @@ export async function initializeDatabase(): Promise<void> {
   // Idempotent migration: add favourite column to existing databases.
   try {
     await db.runAsync(`ALTER TABLE vaults ADD COLUMN favourite INTEGER NOT NULL DEFAULT 0;`, []);
-  } catch {
-    // Column already exists — ignore.
-  }
+  } catch {}
+  try {
+    await db.runAsync(`ALTER TABLE vaults ADD COLUMN is_note INTEGER NOT NULL DEFAULT 0;`, []);
+  } catch {}
 
   await db.runAsync(
     `
@@ -126,9 +129,38 @@ export async function getVaults(): Promise<VaultRow[]> {
         strength_score,
         totp_secret,
         favourite,
+        is_note,
         created_at,
         updated_at
       FROM vaults
+      WHERE is_note = 0
+      ORDER BY updated_at DESC;
+    `,
+    [],
+  );
+}
+
+export async function getNotes(): Promise<VaultRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<VaultRow>(
+    `
+      SELECT
+        id,
+        site_name,
+        url,
+        username,
+        encrypted_password,
+        category,
+        notes,
+        tags,
+        strength_score,
+        totp_secret,
+        favourite,
+        is_note,
+        created_at,
+        updated_at
+      FROM vaults
+      WHERE is_note = 1
       ORDER BY updated_at DESC;
     `,
     [],
@@ -151,6 +183,7 @@ export async function getFavourites(): Promise<VaultRow[]> {
         strength_score,
         totp_secret,
         favourite,
+        is_note,
         created_at,
         updated_at
       FROM vaults
@@ -176,6 +209,7 @@ export type CreateVaultInput = {
   tags: string | null;
   strengthScore: number | null;
   totpSecret: string | null;
+  isNote?: number; // 0 or 1
 };
 
 export async function insertVault(input: CreateVaultInput): Promise<number> {
@@ -192,10 +226,11 @@ export async function insertVault(input: CreateVaultInput): Promise<number> {
         tags,
         strength_score,
         totp_secret,
+        is_note,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
       input.siteName,
@@ -207,6 +242,7 @@ export async function insertVault(input: CreateVaultInput): Promise<number> {
       input.tags,
       input.strengthScore,
       input.totpSecret,
+      input.isNote ?? 0,
       new Date().toISOString(),
       new Date().toISOString(),
     ],
@@ -231,6 +267,7 @@ export async function getVaultById(id: number): Promise<VaultRow | null> {
         strength_score,
         totp_secret,
         favourite,
+        is_note,
         created_at,
         updated_at
       FROM vaults

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 
 type ToastType = "success" | "error" | "info";
@@ -65,10 +66,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
               { opacity: t.opacity, transform: [{ translateY: t.translateY }] },
             ]}
           >
-            <Text style={styles.toastText}>
-              {t.type === "success" ? "✓  " : t.type === "error" ? "✕  " : "ℹ  "}
-              {t.message}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              {t.type === "success" ? <Ionicons name="checkmark-circle" size={16} color={Colors.success} /> : 
+               t.type === "error" ? <Ionicons name="close-circle" size={16} color={Colors.errorText} /> : 
+               <Ionicons name="information-circle" size={16} color={Colors.accent} />}
+              <Text style={styles.toastText}>
+                {t.message}
+              </Text>
+            </View>
           </Animated.View>
         ))}
       </View>

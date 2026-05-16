@@ -3,17 +3,18 @@ import * as Clipboard from "expo-clipboard";
 import { StackScreenProps } from "@react-navigation/stack";
 import {
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
   ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { Colors } from "../theme/colors";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
+import { Ionicons } from "@expo/vector-icons";
 
 type GeneratorScreenProps = StackScreenProps<RootStackParamList, "Generator">;
 
@@ -111,14 +112,14 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>⚡ Generator</Text>
+        <Text style={styles.title}><Ionicons name="flash" size={24} /> Generator</Text>
         <Text style={styles.subtitle}>Create cryptographically strong passwords instantly.</Text>
 
         {/* Output card */}
         <View style={styles.outputCard}>
           <Text style={styles.outputText}>{value}</Text>
           <View style={styles.outputMeta}>
-            <Text style={styles.entropyText}>🕒 Crack time: {crackTime}</Text>
+            <Text style={styles.entropyText}><Ionicons name="time-outline" size={12} /> Crack time: {crackTime}</Text>
             <Text style={styles.lengthBadge}>{value.length} chars</Text>
           </View>
         </View>
@@ -149,13 +150,13 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
 
         {/* Actions */}
         <Pressable style={styles.primaryButton} onPress={regenerate}>
-          <Text style={styles.primaryText}>🔄 Regenerate</Text>
+          <Text style={styles.primaryText}><Ionicons name="refresh" size={14} /> Regenerate</Text>
         </Pressable>
         <Pressable style={styles.secondaryButton} onPress={() => void copyGenerated()}>
-          <Text style={styles.secondaryText}>📋 Copy Password</Text>
+          <Text style={styles.secondaryText}><Ionicons name="copy-outline" size={14} /> Copy Password</Text>
         </Pressable>
         <Pressable style={styles.secondaryButton} onPress={() => void useInAddFlow()}>
-          <Text style={styles.secondaryText}>➕ Use in Add Password</Text>
+          <Text style={styles.secondaryText}><Ionicons name="add" size={14} /> Use in Add Password</Text>
         </Pressable>
 
         {/* History */}
@@ -183,7 +184,7 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
         activeTab="Generator"
         onTabPress={(tab) => {
           if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Favourites") navigation.navigate("Favourites");
+          else if (tab === "Notes") navigation.navigate("Notes");
           else if (tab === "Settings") navigation.navigate("Settings");
         }}
         onAddPress={() => navigation.navigate("AddPassword")}

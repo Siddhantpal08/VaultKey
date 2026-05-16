@@ -5,13 +5,13 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { deleteVault, getSetting, getVaultById, toggleFavourite, updateVault } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { decryptWithSession, encryptWithSession, hasSessionKey } from "../security/crypto";
@@ -20,6 +20,7 @@ import { Colors } from "../theme/colors";
 import { StrengthMeter } from "../components/StrengthMeter";
 import { SiteIcon } from "../components/SiteIcon";
 import { useToast } from "../components/Toast";
+import { Ionicons } from "@expo/vector-icons";
 
 type PasswordDetailScreenProps = StackScreenProps<RootStackParamList, "PasswordDetail">;
 
@@ -174,7 +175,7 @@ export default function PasswordDetailScreen({
     const newVal = isFavourite ? 0 : 1;
     await toggleFavourite(route.params.id, newVal as 0 | 1);
     setIsFavourite(!!newVal);
-    toast.show(newVal === 1 ? "Added to starred ⭐" : "Removed from starred", newVal === 1 ? "success" : "info");
+    toast.show(newVal === 1 ? "Added to starred" : "Removed from starred", newVal === 1 ? "success" : "info");
   };
 
   if (isLoading || !entry) {
@@ -195,17 +196,23 @@ export default function PasswordDetailScreen({
         {/* Top bar */}
         <View style={styles.topBar}>
           <Pressable style={styles.topBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.topBtnText}>← Back</Text>
+            <Ionicons name="arrow-back" size={20} color={Colors.accent} />
           </Pressable>
           <View style={styles.topRight}>
             <Pressable style={styles.starBtn} onPress={() => void handleToggleFavourite()}>
-              <Text style={{ fontSize: 22, opacity: isFavourite ? 1 : 0.3 }}>⭐</Text>
+              <Ionicons 
+                name={isFavourite ? "star" : "star-outline"} 
+                size={22} 
+                color={isFavourite ? Colors.star : Colors.textMuted} 
+              />
             </Pressable>
             <Pressable
               style={styles.topBtn}
               onPress={() => setIsEditing((v) => !v)}
             >
-              <Text style={styles.topBtnText}>{isEditing ? "✕ Cancel" : "✎ Edit"}</Text>
+              <Text style={styles.topBtnText}>
+                {isEditing ? <><Ionicons name="close" size={14} /> Cancel</> : <><Ionicons name="pencil" size={14} /> Edit</>}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -223,7 +230,7 @@ export default function PasswordDetailScreen({
         {entry.totpSecret && totp ? (
           <View style={styles.totpCard}>
             <View style={styles.totpLeft}>
-              <Text style={styles.totpLabel}>🔒 Two-Factor Code</Text>
+              <Text style={styles.totpLabel}><Ionicons name="lock-closed" size={10} /> Two-Factor Code</Text>
               <Text style={styles.totpCode}>{totp.code.slice(0, 3)} {totp.code.slice(3)}</Text>
               <Text style={styles.totpTimer}>Refreshes in {totp.secondsLeft}s</Text>
             </View>
@@ -253,7 +260,7 @@ export default function PasswordDetailScreen({
         <Field label="Username">
           <EditableText value={entry.username} editable={isEditing} onChangeText={(v) => updateField("username", v)} />
           <Pressable onPress={() => void copyToClipboard(entry.username, "Username")} style={styles.copyBtn}>
-            <Text style={styles.copyBtnText}>📋 Copy Username</Text>
+            <Text style={styles.copyBtnText}><Ionicons name="copy-outline" size={14} /> Copy Username</Text>
           </Pressable>
         </Field>
 
@@ -267,10 +274,12 @@ export default function PasswordDetailScreen({
           />
           <View style={styles.pwActions}>
             <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.copyBtn}>
-              <Text style={styles.copyBtnText}>{showPassword ? "🙈 Hide" : "👁 Reveal"}</Text>
+              <Text style={styles.copyBtnText}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={14} /> {showPassword ? "Hide" : "Reveal"}
+              </Text>
             </Pressable>
             <Pressable onPress={() => void copyToClipboard(entry.password, "Password")} style={styles.copyBtn}>
-              <Text style={styles.copyBtnText}>📋 Copy</Text>
+              <Text style={styles.copyBtnText}><Ionicons name="copy-outline" size={14} /> Copy</Text>
             </Pressable>
           </View>
           <View style={styles.strengthWrap}>
@@ -325,7 +334,7 @@ export default function PasswordDetailScreen({
               onPress={() => void copyToClipboard(entry.totpSecret, "TOTP secret")}
               style={styles.copyBtn}
             >
-              <Text style={styles.copyBtnText}>📋 Copy Secret</Text>
+              <Text style={styles.copyBtnText}><Ionicons name="copy-outline" size={14} /> Copy Secret</Text>
             </Pressable>
           ) : null}
         </Field>
@@ -353,12 +362,12 @@ export default function PasswordDetailScreen({
             onPress={() => void onSave()}
             disabled={isSaving}
           >
-            <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "💾 Save Changes"}</Text>
+            <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : <><Ionicons name="save" size={15} /> Save Changes</>}</Text>
           </Pressable>
         ) : null}
 
         <Pressable style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteButtonText}>🗑 Delete Entry</Text>
+          <Text style={styles.deleteButtonText}><Ionicons name="trash" size={14} /> Delete Entry</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

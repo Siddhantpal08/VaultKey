@@ -2,74 +2,65 @@ import React from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { StackScreenProps } from "@react-navigation/stack";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getFavourites, toggleFavourite, type VaultRow } from "../database/db";
+import { getNotes, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { Colors } from "../theme/colors";
-import { SiteIcon } from "../components/SiteIcon";
-import { useToast } from "../components/Toast";
+import { BottomTabBar } from "../components/BottomTabBar";
 import { Ionicons } from "@expo/vector-icons";
 
-type FavouritesScreenProps = StackScreenProps<RootStackParamList, "Favourites">;
+type NotesScreenProps = StackScreenProps<RootStackParamList, "Notes">;
 
-export default function FavouritesScreen({ navigation }: FavouritesScreenProps): React.JSX.Element {
+export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX.Element {
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
-  const [vaults, setVaults] = React.useState<VaultRow[]>([]);
+  const [notes, setNotes] = React.useState<VaultRow[]>([]);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
-  const toast = useToast();
 
-  const loadFavourites = React.useCallback(async (): Promise<void> => {
+  const loadNotes = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
-    const rows = await getFavourites();
-    setVaults(rows);
+    const rows = await getNotes();
+    setNotes(rows);
     setIsLoading(false);
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      void loadFavourites();
-    }, [loadFavourites]),
+      void loadNotes();
+    }, [loadNotes])
   );
 
   const filtered = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return vaults;
-    return vaults.filter(
+    if (!q) return notes;
+    return notes.filter(
       (v) =>
         v.site_name.toLowerCase().includes(q) ||
-        v.username.toLowerCase().includes(q) ||
-        (v.tags ?? "").toLowerCase().includes(q),
+        (v.category ?? "").toLowerCase().includes(q)
     );
-  }, [vaults, searchQuery]);
-
-  const handleUnstar = async (item: VaultRow): Promise<void> => {
-    await toggleFavourite(item.id, 0);
-    setVaults((current) => current.filter((v) => v.id !== item.id));
-    toast.show("Removed from starred", "info");
-  };
+  }, [notes, searchQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Starred</Text>
-            <Text style={styles.subtitle}>{vaults.length} favourites</Text>
+            <Text style={styles.title}>Secure Notes</Text>
+            <Text style={styles.subtitle}>{notes.length} notes safely stored</Text>
           </View>
-          <Ionicons name="star" size={28} color={Colors.star} />
+          <Ionicons name="document-text" size={32} color={Colors.accent} />
         </View>
 
         <TextInput
           style={styles.searchInput}
-          placeholder="Search starred..."
+          placeholder="Search notes..."
           placeholderTextColor={Colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -88,40 +79,48 @@ export default function FavouritesScreen({ navigation }: FavouritesScreenProps):
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Ionicons name="star" size={48} color={Colors.star} style={styles.emptyEmoji} />
-                <Text style={styles.emptyTitle}>No starred entries</Text>
+                <Ionicons name="document-text" size={48} color={Colors.accent} style={styles.emptyEmoji} />
+                <Text style={styles.emptyTitle}>No notes found</Text>
                 <Text style={styles.emptySubtitle}>
-                  Tap the star on any password card to add it here.
+                  Tap the + button to create a secure note.
                 </Text>
               </View>
             }
             renderItem={({ item }) => (
               <Pressable
                 style={styles.card}
-                onPress={() => navigation.navigate("PasswordDetail", { id: item.id })}
+                onPress={() => navigation.navigate("NoteDetail", { id: item.id })}
               >
                 <View style={styles.cardRow}>
-                  <SiteIcon siteName={item.site_name} size={46} />
+                  <View style={styles.iconBox}>
+                    <Ionicons name="document" size={24} color={Colors.bg} />
+                  </View>
                   <View style={styles.cardMain}>
                     <Text style={styles.cardTitle}>{item.site_name}</Text>
-                    <Text style={styles.cardMeta}>{item.username}</Text>
+                    <Text style={styles.cardMeta}>
+                      {new Date(item.updated_at).toLocaleDateString()}
+                    </Text>
                     {item.category ? (
                       <Text style={styles.categoryBadge}>{item.category}</Text>
                     ) : null}
                   </View>
-                  <Pressable
-                    style={styles.starButton}
-                    onPress={() => void handleUnstar(item)}
-                    hitSlop={12}
-                  >
-                    <Ionicons name="star" size={20} color={Colors.star} />
-                  </Pressable>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
                 </View>
               </Pressable>
             )}
           />
         )}
       </View>
+
+      <BottomTabBar
+        activeTab="Notes"
+        onTabPress={(tab) => {
+          if (tab === "Vault") navigation.navigate("Home");
+          else if (tab === "Generator") navigation.navigate("Generator");
+          else if (tab === "Settings") navigation.navigate("Settings");
+        }}
+        onAddPress={() => navigation.navigate("AddNote")}
+      />
     </SafeAreaView>
   );
 }
@@ -151,7 +150,7 @@ const styles = StyleSheet.create({
   loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   listContent: { paddingBottom: 20, gap: 10 },
   emptyState: { alignItems: "center", paddingVertical: 60 },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
+  emptyEmoji: { marginBottom: 12 },
   emptyTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: "700", marginBottom: 6 },
   emptySubtitle: { color: Colors.textSecondary, fontSize: 14, textAlign: "center", lineHeight: 20 },
   card: {
@@ -162,6 +161,14 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  iconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cardMain: { flex: 1 },
   cardTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 2 },
   cardMeta: { color: Colors.textSecondary, fontSize: 13 },
@@ -177,5 +184,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     overflow: "hidden",
   },
-  starButton: { padding: 4 },
 });
