@@ -24,6 +24,8 @@ let sessionKeyB64: string | null = null;
 
 function deriveKey(password: string, saltB64: string, iterations: number): Buffer {
   const salt = Buffer.from(saltB64, "base64");
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error react-native-quick-crypto Buffer type mismatch
   return pbkdf2Sync(password, salt, iterations, KEY_BYTES, DIGEST);
 }
 
@@ -106,7 +108,8 @@ export function decryptWithSession(cipherText: string): string {
   const authTag = Buffer.from(parts[2], "base64");
   const encrypted = Buffer.from(parts[3], "base64");
   const decipher = createDecipheriv(ALGO, key, iv);
+  // @ts-ignore react-native-quick-crypto Buffer<ArrayBuffer> vs Buffer type mismatch
   decipher.setAuthTag(authTag);
-  const plain = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+  const plain = Buffer.concat([decipher.update(encrypted) as unknown as Uint8Array, decipher.final() as unknown as Uint8Array]);
   return plain.toString("utf8");
 }

@@ -13,11 +13,28 @@ import {
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { createMasterMeta, setSessionFromMaster, verifyMasterPassword } from "../security/crypto";
+import { Colors } from "../theme/colors";
+import { StrengthMeter } from "../components/StrengthMeter";
 
 type MasterPasswordScreenProps = StackScreenProps<RootStackParamList, "MasterPassword">;
 
 const MASTER_PASSWORD_KEY = "master_password";
 const MASTER_PASSWORD_META_KEY = "master_password_meta";
+
+function computePasswordStrength(password: string): number {
+  if (!password) return 0;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (hasUpper && hasLower) score += 1;
+  if (hasNumber) score += 1;
+  if (hasSpecial) score += 1;
+  return Math.min(5, score);
+}
 
 export default function MasterPasswordScreen({
   navigation,
@@ -49,26 +66,7 @@ export default function MasterPasswordScreen({
     };
   }, []);
 
-  const strength = React.useMemo(() => {
-    if (!password) {
-      return { label: "Very Weak", color: "#EF4444", score: 0 };
-    }
-    const hasUpper = /[A-Z]/.test(password);
-    const hasLower = /[a-z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    const hasSpecial = /[^A-Za-z0-9]/.test(password);
-    let score = 0;
-    if (password.length >= 8) score += 1;
-    if (password.length >= 12) score += 1;
-    if (hasUpper && hasLower) score += 1;
-    if (hasNumber) score += 1;
-    if (hasSpecial) score += 1;
-    if (score <= 1) return { label: "Weak", color: "#F97316", score };
-    if (score === 2) return { label: "Fair", color: "#EAB308", score };
-    if (score === 3) return { label: "Good", color: "#84CC16", score };
-    if (score === 4) return { label: "Strong", color: "#22C55E", score };
-    return { label: "Very Strong", color: "#16A34A", score };
-  }, [password]);
+  const score = React.useMemo(() => computePasswordStrength(password), [password]);
 
   const onContinue = async (): Promise<void> => {
     if (!password.trim()) {
@@ -131,7 +129,7 @@ export default function MasterPasswordScreen({
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#5B8DEF" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       </SafeAreaView>
     );
@@ -140,164 +138,170 @@ export default function MasterPasswordScreen({
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.title}>{isSetupMode ? "Create Master Password" : "Verify Identity"}</Text>
+        {/* Header */}
+        <View style={styles.headerIcon}>
+          <Text style={styles.headerEmoji}>{isSetupMode ? "🛡️" : "🔑"}</Text>
+        </View>
+        <Text style={styles.title}>
+          {isSetupMode ? "Create Master Password" : "Verify Identity"}
+        </Text>
         <Text style={styles.subtitle}>
           {isSetupMode
-            ? "Set a strong master password to secure your vault."
+            ? "This password encrypts your entire vault.\nMake it strong and memorable."
             : "Enter your master password to unlock your vault."}
         </Text>
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder={isSetupMode ? "Create master password" : "Enter master password"}
-            placeholderTextColor="#8B94A8"
-            secureTextEntry={!showPassword}
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            autoCapitalize="none"
-          />
-          {isSetupMode ? (
+        {/* Input card */}
+        <View style={styles.card}>
+          <View style={styles.inputWrap}>
             <TextInput
-              placeholder="Confirm master password"
-              placeholderTextColor="#8B94A8"
+              placeholder={isSetupMode ? "Create master password" : "Enter master password"}
+              placeholderTextColor={Colors.textMuted}
               secureTextEntry={!showPassword}
               style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              value={password}
+              onChangeText={setPassword}
               autoCapitalize="none"
+              autoCorrect={false}
             />
+          </View>
+
+          {isSetupMode ? (
+            <View style={styles.inputWrap}>
+              <TextInput
+                placeholder="Confirm master password"
+                placeholderTextColor={Colors.textMuted}
+                secureTextEntry={!showPassword}
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          ) : null}
+
+          <Pressable style={styles.showToggle} onPress={() => setShowPassword((v) => !v)}>
+            <Text style={styles.showToggleText}>{showPassword ? "🙈 Hide" : "👁 Show"} password</Text>
+          </Pressable>
+
+          {password.length > 0 && isSetupMode ? (
+            <View style={styles.strengthWrap}>
+              <StrengthMeter score={score} />
+            </View>
           ) : null}
         </View>
 
-        <Pressable style={styles.showToggle} onPress={() => setShowPassword((value) => !value)}>
-          <Text style={styles.showToggleText}>{showPassword ? "Hide password" : "Show password"}</Text>
-        </Pressable>
-
-        {password.length > 0 ? (
-          <View style={styles.strengthBox}>
-            <View style={styles.strengthBars}>
-              {[0, 1, 2, 3, 4].map((item) => (
-                <View
-                  key={item}
-                  style={[
-                    styles.strengthBar,
-                    { backgroundColor: item < strength.score ? strength.color : "#1B2D4D" },
-                  ]}
-                />
-              ))}
-            </View>
-            <Text style={[styles.strengthText, { color: strength.color }]}>{strength.label}</Text>
-          </View>
-        ) : null}
-
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <Pressable style={styles.primaryButton} onPress={() => void onContinue()} disabled={isSubmitting}>
+        <Pressable
+          style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+          onPress={() => void onContinue()}
+          disabled={isSubmitting}
+        >
           <Text style={styles.primaryButtonText}>
             {isSubmitting ? "Please wait..." : isSetupMode ? "Save & Continue" : "Unlock Vault"}
           </Text>
         </Pressable>
 
         <Pressable style={styles.secondaryButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.secondaryButtonText}>Back to Lock</Text>
+          <Text style={styles.secondaryButtonText}>← Back to Lock Screen</Text>
         </Pressable>
+
+        {isSetupMode ? (
+          <Text style={styles.hint}>
+            ⚠️ There is no password recovery. Store it safely.
+          </Text>
+        ) : null}
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#0B1020",
-  },
-  loader: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  safeArea: { flex: 1, backgroundColor: Colors.bg },
+  loader: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     justifyContent: "center",
   },
+  headerIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: Colors.accentBg,
+    borderWidth: 1,
+    borderColor: Colors.accentBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  headerEmoji: { fontSize: 30 },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.textPrimary,
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#8B94A8",
+    fontSize: 13,
+    color: Colors.textSecondary,
     textAlign: "center",
-    marginBottom: 28,
+    lineHeight: 19,
+    marginBottom: 24,
   },
-  inputContainer: {
-    gap: 12,
+  card: {
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    gap: 10,
   },
+  inputWrap: {},
   input: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: Colors.borderInput,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    color: "#FFFFFF",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    color: Colors.textPrimary,
+    backgroundColor: Colors.bgInput,
+    fontSize: 15,
   },
-  showToggle: {
-    marginTop: 10,
-    marginBottom: 14,
-  },
-  showToggleText: {
-    color: "#5B8DEF",
-    textAlign: "right",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  strengthBox: {
-    marginBottom: 10,
-  },
-  strengthBars: {
-    flexDirection: "row",
-    gap: 6,
-    marginBottom: 6,
-  },
-  strengthBar: {
-    flex: 1,
-    height: 5,
-    borderRadius: 999,
-  },
-  strengthText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  errorText: {
-    color: "#F87171",
-    fontSize: 13,
-    marginBottom: 10,
-  },
+  showToggle: { alignSelf: "flex-end", paddingVertical: 2 },
+  showToggleText: { color: Colors.accent, fontSize: 12, fontWeight: "600" },
+  strengthWrap: { marginTop: 4 },
+  errorText: { color: Colors.errorText, fontSize: 13, marginBottom: 10, textAlign: "center" },
   primaryButton: {
-    marginTop: 6,
-    borderRadius: 12,
-    backgroundColor: "#5B8DEF",
-    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    paddingVertical: 15,
     alignItems: "center",
+    marginBottom: 10,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    marginTop: 12,
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  secondaryButtonText: {
-    color: "#8B94A8",
-    fontSize: 14,
+  primaryButtonDisabled: { opacity: 0.7 },
+  primaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700" },
+  secondaryButton: { alignItems: "center", paddingVertical: 12 },
+  secondaryButtonText: { color: Colors.textSecondary, fontSize: 14 },
+  hint: {
+    marginTop: 16,
+    color: Colors.warning,
+    fontSize: 12,
+    textAlign: "center",
+    backgroundColor: Colors.warningBg,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.3)",
   },
 });

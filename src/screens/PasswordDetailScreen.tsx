@@ -12,11 +12,18 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { deleteVault, getSetting, getVaultById, updateVault } from "../database/db";
+import { deleteVault, getSetting, getVaultById, toggleFavourite, updateVault } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { decryptWithSession, encryptWithSession, hasSessionKey } from "../security/crypto";
+import { generateTOTP, type TOTPResult } from "../security/totp";
+import { Colors } from "../theme/colors";
+import { StrengthMeter } from "../components/StrengthMeter";
+import { SiteIcon } from "../components/SiteIcon";
+import { useToast } from "../components/Toast";
 
 type PasswordDetailScreenProps = StackScreenProps<RootStackParamList, "PasswordDetail">;
+
+const CATEGORY_OPTIONS = ["General", "Work", "Social", "Finance", "Shopping", "DevOps"];
 
 function computeStrength(password: string): number {
   if (!password) return 0;
@@ -37,6 +44,10 @@ export default function PasswordDetailScreen({
   const [isEditing, setIsEditing] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
+  const [isFavourite, setIsFavourite] = React.useState<boolean>(false);
+  const [totp, setTotp] = React.useState<TOTPResult | null>(null);
+  const toast = useToast();
+
   const [entry, setEntry] = React.useState<{
     siteName: string;
     url: string;
@@ -53,7 +64,7 @@ export default function PasswordDetailScreen({
   const load = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
     if (!hasSessionKey()) {
-      Alert.alert("Session locked", "Please verify your master password to access vault details.", [
+      Alert.alert("Session locked", "Please verify your master password.", [
         { text: "OK", onPress: () => navigation.replace("MasterPassword") },
       ]);
       return;
@@ -65,6 +76,7 @@ export default function PasswordDetailScreen({
       ]);
       return;
     }
+    setIsFavourite(row.favourite === 1);
     setEntry({
       siteName: row.site_name,
       url: row.url ?? "",
@@ -84,6 +96,17 @@ export default function PasswordDetailScreen({
     void load();
   }, [load]);
 
+  // Live TOTP ticker
+  React.useEffect(() => {
+    if (!entry?.totpSecret) return;
+    const refresh = (): void => {
+      setTotp(generateTOTP(entry.totpSecret));
+    };
+    refresh();
+    const interval = setInterval(refresh, 1000);
+    return () => clearInterval(interval);
+  }, [entry?.totpSecret]);
+
   const copyToClipboard = async (value: string, label: string): Promise<void> => {
     await Clipboard.setStringAsync(value);
     const ttl = Number((await getSetting("clipboard_clear_seconds")) ?? "30");
@@ -91,7 +114,7 @@ export default function PasswordDetailScreen({
     setTimeout(() => {
       void Clipboard.setStringAsync("");
     }, clearAfterMs);
-    Alert.alert("Copied", `${label} copied. Clipboard clears in ${Math.round(clearAfterMs / 1000)}s.`);
+    toast.show(`${label} copied — clears in ${Math.round(clearAfterMs / 1000)}s`, "success");
   };
 
   const updateField = (key: keyof NonNullable<typeof entry>, value: string): void => {
@@ -101,7 +124,7 @@ export default function PasswordDetailScreen({
   const onSave = async (): Promise<void> => {
     if (!entry) return;
     if (!entry.siteName.trim() || !entry.username.trim() || !entry.password.trim()) {
-      Alert.alert("Missing required fields", "Site name, username, and password are required.");
+      toast.show("Site name, username, and password are required.", "error");
       return;
     }
     try {
@@ -120,9 +143,9 @@ export default function PasswordDetailScreen({
       });
       setIsEditing(false);
       await load();
-      Alert.alert("Saved", "Password entry updated.");
+      toast.show("Changes saved", "success");
     } catch {
-      Alert.alert("Unable to save", "Please try again.");
+      toast.show("Unable to save. Please try again.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -137,105 +160,205 @@ export default function PasswordDetailScreen({
         onPress: async () => {
           try {
             await deleteVault(route.params.id);
+            toast.show("Entry deleted", "info");
             navigation.replace("Home");
           } catch {
-            Alert.alert("Delete failed", "Please try again.");
+            toast.show("Delete failed. Please try again.", "error");
           }
         },
       },
     ]);
   };
 
+  const handleToggleFavourite = async (): Promise<void> => {
+    const newVal = isFavourite ? 0 : 1;
+    await toggleFavourite(route.params.id, newVal as 0 | 1);
+    setIsFavourite(!!newVal);
+    toast.show(newVal === 1 ? "Added to starred ⭐" : "Removed from starred", newVal === 1 ? "success" : "info");
+  };
+
   if (isLoading || !entry) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#5B8DEF" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
+  const strength = computeStrength(entry.password);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => navigation.goBack()}>
-            <Text style={styles.topAction}>Back</Text>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <Pressable style={styles.topBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.topBtnText}>← Back</Text>
           </Pressable>
-          <Pressable onPress={() => setIsEditing((current) => !current)}>
-            <Text style={styles.topAction}>{isEditing ? "Cancel Edit" : "Edit"}</Text>
-          </Pressable>
+          <View style={styles.topRight}>
+            <Pressable style={styles.starBtn} onPress={() => void handleToggleFavourite()}>
+              <Text style={{ fontSize: 22, opacity: isFavourite ? 1 : 0.3 }}>⭐</Text>
+            </Pressable>
+            <Pressable
+              style={styles.topBtn}
+              onPress={() => setIsEditing((v) => !v)}
+            >
+              <Text style={styles.topBtnText}>{isEditing ? "✕ Cancel" : "✎ Edit"}</Text>
+            </Pressable>
+          </View>
         </View>
 
-        <Text style={styles.title}>{entry.siteName}</Text>
-        <Text style={styles.subtitle}>Updated {new Date(entry.updatedAt).toLocaleString()}</Text>
+        {/* Hero */}
+        <View style={styles.hero}>
+          <SiteIcon siteName={entry.siteName} size={64} fontSize={26} />
+          <View style={styles.heroText}>
+            <Text style={styles.heroTitle}>{entry.siteName}</Text>
+            <Text style={styles.heroSub}>Updated {new Date(entry.updatedAt).toLocaleDateString()}</Text>
+          </View>
+        </View>
 
-        <Field label="Site Name">
-          <EditableText value={entry.siteName} editable={isEditing} onChangeText={(v) => updateField("siteName", v)} />
-        </Field>
-        <Field label="URL">
-          <EditableText value={entry.url} editable={isEditing} onChangeText={(v) => updateField("url", v)} />
-        </Field>
+        {/* TOTP live card */}
+        {entry.totpSecret && totp ? (
+          <View style={styles.totpCard}>
+            <View style={styles.totpLeft}>
+              <Text style={styles.totpLabel}>🔒 Two-Factor Code</Text>
+              <Text style={styles.totpCode}>{totp.code.slice(0, 3)} {totp.code.slice(3)}</Text>
+              <Text style={styles.totpTimer}>Refreshes in {totp.secondsLeft}s</Text>
+            </View>
+            <View style={styles.totpRight}>
+              <View
+                style={[
+                  styles.totpProgressRing,
+                  {
+                    borderColor:
+                      totp.secondsLeft > 10 ? Colors.success : Colors.warning,
+                  },
+                ]}
+              >
+                <Text style={styles.totpProgressText}>{totp.secondsLeft}</Text>
+              </View>
+            </View>
+            <Pressable
+              style={styles.totpCopy}
+              onPress={() => void copyToClipboard(totp.code, "TOTP code")}
+            >
+              <Text style={styles.totpCopyText}>Copy</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Fields */}
         <Field label="Username">
           <EditableText value={entry.username} editable={isEditing} onChangeText={(v) => updateField("username", v)} />
-          <Pressable onPress={() => void copyToClipboard(entry.username, "Username")} style={styles.inlineCopy}>
-            <Text style={styles.inlineCopyText}>Copy Username</Text>
+          <Pressable onPress={() => void copyToClipboard(entry.username, "Username")} style={styles.copyBtn}>
+            <Text style={styles.copyBtnText}>📋 Copy Username</Text>
           </Pressable>
         </Field>
+
         <Field label="Password">
           <EditableText
             value={entry.password}
             editable={isEditing}
             secureTextEntry={!showPassword}
             onChangeText={(v) => updateField("password", v)}
+            mono
           />
-          <View style={styles.inlineActions}>
-            <Pressable onPress={() => setShowPassword((value) => !value)} style={styles.inlineActionBtn}>
-              <Text style={styles.inlineCopyText}>{showPassword ? "Hide" : "Reveal"} Password</Text>
+          <View style={styles.pwActions}>
+            <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.copyBtn}>
+              <Text style={styles.copyBtnText}>{showPassword ? "🙈 Hide" : "👁 Reveal"}</Text>
             </Pressable>
-            <Pressable onPress={() => void copyToClipboard(entry.password, "Password")} style={styles.inlineActionBtn}>
-              <Text style={styles.inlineCopyText}>Copy Password</Text>
+            <Pressable onPress={() => void copyToClipboard(entry.password, "Password")} style={styles.copyBtn}>
+              <Text style={styles.copyBtnText}>📋 Copy</Text>
             </Pressable>
           </View>
-          <Text style={styles.metaText}>Strength score: {computeStrength(entry.password)}/5</Text>
+          <View style={styles.strengthWrap}>
+            <StrengthMeter score={strength} />
+          </View>
         </Field>
-        <Field label="Category">
-          <EditableText value={entry.category} editable={isEditing} onChangeText={(v) => updateField("category", v)} />
+
+        <Field label="Site Name">
+          <EditableText value={entry.siteName} editable={isEditing} onChangeText={(v) => updateField("siteName", v)} />
         </Field>
+
+        <Field label="URL">
+          <EditableText value={entry.url} editable={isEditing} onChangeText={(v) => updateField("url", v)} />
+        </Field>
+
+        {/* Category picker in edit mode */}
+        {isEditing ? (
+          <Field label="Category">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt}
+                  style={[styles.catChip, entry.category === opt && styles.catChipActive]}
+                  onPress={() => updateField("category", opt)}
+                >
+                  <Text style={[styles.catChipText, entry.category === opt && styles.catChipTextActive]}>
+                    {opt}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Field>
+        ) : (
+          <Field label="Category">
+            <EditableText value={entry.category || "General"} editable={false} onChangeText={() => {}} />
+          </Field>
+        )}
+
         <Field label="Tags">
           <EditableText value={entry.tags} editable={isEditing} onChangeText={(v) => updateField("tags", v)} />
         </Field>
+
         <Field label="TOTP Secret">
-          <EditableText value={entry.totpSecret} editable={isEditing} onChangeText={(v) => updateField("totpSecret", v)} />
-          {entry.totpSecret ? (
-            <Pressable onPress={() => void copyToClipboard(entry.totpSecret, "TOTP secret")} style={styles.inlineCopy}>
-              <Text style={styles.inlineCopyText}>Copy TOTP Secret</Text>
+          <EditableText
+            value={entry.totpSecret}
+            editable={isEditing}
+            onChangeText={(v) => updateField("totpSecret", v)}
+            placeholder="Base32 secret (optional)"
+          />
+          {entry.totpSecret && !isEditing ? (
+            <Pressable
+              onPress={() => void copyToClipboard(entry.totpSecret, "TOTP secret")}
+              style={styles.copyBtn}
+            >
+              <Text style={styles.copyBtnText}>📋 Copy Secret</Text>
             </Pressable>
           ) : null}
         </Field>
+
         <Field label="Notes">
           <EditableText
             value={entry.notes}
             editable={isEditing}
             multiline
             onChangeText={(v) => updateField("notes", v)}
+            placeholder="Additional details"
           />
         </Field>
 
+        {/* Meta */}
         <View style={styles.metaBox}>
-          <Text style={styles.metaText}>Created: {new Date(entry.createdAt).toLocaleString()}</Text>
-          <Text style={styles.metaText}>Last Updated: {new Date(entry.updatedAt).toLocaleString()}</Text>
+          <Text style={styles.metaText}>Created {new Date(entry.createdAt).toLocaleString()}</Text>
+          <Text style={styles.metaText}>Updated {new Date(entry.updatedAt).toLocaleString()}</Text>
         </View>
 
+        {/* Actions */}
         {isEditing ? (
-          <Pressable style={styles.primaryButton} onPress={() => void onSave()} disabled={isSaving}>
-            <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "Save Changes"}</Text>
+          <Pressable
+            style={[styles.primaryButton, isSaving && styles.primaryButtonDisabled]}
+            onPress={() => void onSave()}
+            disabled={isSaving}
+          >
+            <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "💾 Save Changes"}</Text>
           </Pressable>
         ) : null}
 
         <Pressable style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteButtonText}>Delete Password</Text>
+          <Text style={styles.deleteButtonText}>🗑 Delete Entry</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -257,12 +380,16 @@ function EditableText({
   secureTextEntry,
   multiline,
   onChangeText,
+  mono,
+  placeholder,
 }: {
   value: string;
   editable: boolean;
   secureTextEntry?: boolean;
   multiline?: boolean;
   onChangeText: (value: string) => void;
+  mono?: boolean;
+  placeholder?: string;
 }): React.JSX.Element {
   return (
     <TextInput
@@ -271,63 +398,137 @@ function EditableText({
       editable={editable}
       secureTextEntry={secureTextEntry}
       multiline={multiline}
+      placeholder={placeholder}
+      placeholderTextColor={Colors.textMuted}
       textAlignVertical={multiline ? "top" : "center"}
-      style={[styles.input, !editable ? styles.readonlyInput : null, multiline ? styles.textArea : null]}
-      placeholderTextColor="#7B859B"
+      style={[
+        styles.input,
+        !editable ? styles.readonlyInput : styles.editableInput,
+        multiline ? styles.textArea : null,
+        mono ? styles.monoInput : null,
+      ]}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#0B1020" },
+  safeArea: { flex: 1, backgroundColor: Colors.bg },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
-  container: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  topAction: { color: "#5B8DEF", fontWeight: "700", fontSize: 13 },
-  title: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", marginBottom: 2 },
-  subtitle: { color: "#8B94A8", fontSize: 12, marginBottom: 14 },
+  container: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  topRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  topBtn: { paddingVertical: 6, paddingHorizontal: 2 },
+  topBtnText: { color: Colors.accent, fontWeight: "700", fontSize: 13 },
+  starBtn: { padding: 4 },
+  hero: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
+  heroText: { flex: 1 },
+  heroTitle: { color: Colors.textPrimary, fontSize: 24, fontWeight: "700" },
+  heroSub: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  totpCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.35)",
+    backgroundColor: "rgba(34,197,94,0.08)",
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  totpLeft: { flex: 1 },
+  totpLabel: { color: Colors.success, fontSize: 11, fontWeight: "700", marginBottom: 4 },
+  totpCode: {
+    color: Colors.textPrimary,
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: 6,
+    fontVariant: ["tabular-nums"],
+  },
+  totpTimer: { color: Colors.textSecondary, fontSize: 11, marginTop: 4 },
+  totpRight: { alignItems: "center", justifyContent: "center" },
+  totpProgressRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  totpProgressText: { color: Colors.textPrimary, fontWeight: "700", fontSize: 14 },
+  totpCopy: {
+    width: "100%",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  totpCopyText: { color: Colors.success, fontWeight: "700", fontSize: 12 },
   field: { marginBottom: 14 },
-  fieldLabel: { color: "#D2DCF0", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  fieldLabel: { color: Colors.textAccent, fontSize: 12, fontWeight: "700", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: "#FFFFFF",
+    color: Colors.textPrimary,
+    fontSize: 14,
   },
-  readonlyInput: { opacity: 0.9 },
+  readonlyInput: {
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+  },
+  editableInput: {
+    borderColor: Colors.accentBorder,
+    backgroundColor: Colors.bgInput,
+  },
+  monoInput: { fontVariant: ["tabular-nums"] },
   textArea: { minHeight: 90 },
-  inlineCopy: { marginTop: 7, alignSelf: "flex-start" },
-  inlineActions: { marginTop: 8, flexDirection: "row", gap: 12 },
-  inlineActionBtn: { alignSelf: "flex-start" },
-  inlineCopyText: { color: "#5B8DEF", fontSize: 12, fontWeight: "700" },
+  copyBtn: { marginTop: 6, alignSelf: "flex-start" },
+  copyBtnText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
+  pwActions: { flexDirection: "row", gap: 16, marginTop: 6 },
+  strengthWrap: { marginTop: 8 },
+  catList: { gap: 8, paddingVertical: 4 },
+  catChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  catChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  catChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  catChipTextActive: { color: Colors.textPrimary },
   metaBox: {
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    gap: 4,
-  },
-  metaText: { color: "#8B94A8", fontSize: 12 },
-  primaryButton: {
+    borderColor: Colors.border,
     borderRadius: 12,
-    backgroundColor: "#5B8DEF",
+    padding: 10,
+    backgroundColor: Colors.bgCard,
+    gap: 3,
+  },
+  metaText: { color: Colors.textMuted, fontSize: 11 },
+  primaryButton: {
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
     paddingVertical: 14,
     alignItems: "center",
     marginBottom: 10,
   },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  primaryButtonDisabled: { opacity: 0.7 },
+  primaryButtonText: { color: Colors.textPrimary, fontSize: 15, fontWeight: "700" },
   deleteButton: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.7)",
-    backgroundColor: "rgba(248,113,113,0.14)",
-    paddingVertical: 12,
+    borderColor: "rgba(248,113,113,0.6)",
+    backgroundColor: Colors.errorBg,
+    paddingVertical: 13,
     alignItems: "center",
   },
   deleteButtonText: { color: "#FCA5A5", fontSize: 14, fontWeight: "700" },

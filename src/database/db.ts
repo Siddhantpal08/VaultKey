@@ -13,6 +13,7 @@ export type VaultRow = {
   tags: string | null;
   strength_score: number | null;
   totp_secret: string | null;
+  favourite: number; // 0 | 1
   created_at: string;
   updated_at: string;
 };
@@ -51,12 +52,20 @@ export async function initializeDatabase(): Promise<void> {
         tags TEXT,
         strength_score INTEGER,
         totp_secret TEXT,
+        favourite INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
     `,
     [],
   );
+
+  // Idempotent migration: add favourite column to existing databases.
+  try {
+    await db.runAsync(`ALTER TABLE vaults ADD COLUMN favourite INTEGER NOT NULL DEFAULT 0;`, []);
+  } catch {
+    // Column already exists — ignore.
+  }
 
   await db.runAsync(
     `
@@ -91,6 +100,14 @@ export async function initializeDatabase(): Promise<void> {
     `,
     [],
   );
+
+  await db.runAsync(
+    `
+      CREATE INDEX IF NOT EXISTS idx_vaults_favourite
+      ON vaults(favourite);
+    `,
+    [],
+  );
 }
 
 export async function getVaults(): Promise<VaultRow[]> {
@@ -108,6 +125,7 @@ export async function getVaults(): Promise<VaultRow[]> {
         tags,
         strength_score,
         totp_secret,
+        favourite,
         created_at,
         updated_at
       FROM vaults
@@ -115,6 +133,37 @@ export async function getVaults(): Promise<VaultRow[]> {
     `,
     [],
   );
+}
+
+export async function getFavourites(): Promise<VaultRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<VaultRow>(
+    `
+      SELECT
+        id,
+        site_name,
+        url,
+        username,
+        encrypted_password,
+        category,
+        notes,
+        tags,
+        strength_score,
+        totp_secret,
+        favourite,
+        created_at,
+        updated_at
+      FROM vaults
+      WHERE favourite = 1
+      ORDER BY site_name ASC;
+    `,
+    [],
+  );
+}
+
+export async function toggleFavourite(id: number, value: 0 | 1): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`UPDATE vaults SET favourite = ? WHERE id = ?;`, [value, id]);
 }
 
 export type CreateVaultInput = {
@@ -181,6 +230,7 @@ export async function getVaultById(id: number): Promise<VaultRow | null> {
         tags,
         strength_score,
         totp_secret,
+        favourite,
         created_at,
         updated_at
       FROM vaults
@@ -191,6 +241,21 @@ export async function getVaultById(id: number): Promise<VaultRow | null> {
   );
 
   return row ?? null;
+}
+
+/** Store a hashed PIN for the lock screen. Pass null to clear the PIN. */
+export async function setPINHash(hashBase64: string | null): Promise<void> {
+  if (hashBase64 === null) {
+    const db = await getDatabase();
+    await db.runAsync(`DELETE FROM settings WHERE key = 'pin_hash';`, []);
+    return;
+  }
+  await upsertSetting("pin_hash", hashBase64);
+}
+
+/** Retrieve the stored PIN hash, or null if no PIN is set. */
+export async function getPINHash(): Promise<string | null> {
+  return getSetting("pin_hash");
 }
 
 export type UpdateVaultInput = {

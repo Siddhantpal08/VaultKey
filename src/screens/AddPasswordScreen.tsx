@@ -14,6 +14,9 @@ import {
 import { getSetting, insertVault, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
+import { Colors } from "../theme/colors";
+import { StrengthMeter } from "../components/StrengthMeter";
+import { useToast } from "../components/Toast";
 
 type AddPasswordScreenProps = StackScreenProps<RootStackParamList, "AddPassword">;
 
@@ -63,7 +66,7 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
   });
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
-  const [error, setError] = React.useState<string>("");
+  const toast = useToast();
 
   const strength = React.useMemo(() => computeStrength(form.password), [form.password]);
 
@@ -73,9 +76,7 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         const draft = await getSetting("draft_generated_password");
         if (draft && draft.length > 0) {
           setForm((current) => {
-            if (current.password.length > 0) {
-              return current;
-            }
+            if (current.password.length > 0) return current;
             return { ...current, password: draft };
           });
           await upsertSetting("draft_generated_password", "");
@@ -84,14 +85,6 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
       void loadDraft();
     }, []),
   );
-
-  const strengthLabel = React.useMemo(() => {
-    if (strength <= 1) return "Weak";
-    if (strength === 2) return "Fair";
-    if (strength === 3) return "Good";
-    if (strength === 4) return "Strong";
-    return "Very Strong";
-  }, [strength]);
 
   const updateField = (key: keyof FormState, value: string): void => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -104,7 +97,7 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
 
   const onSave = async (): Promise<void> => {
     if (!form.siteName.trim() || !form.username.trim() || !form.password.trim()) {
-      setError("Site name, username, and password are required.");
+      toast.show("Site name, username, and password are required.", "error");
       return;
     }
     try {
@@ -114,7 +107,6 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         return;
       }
       setIsSaving(true);
-      setError("");
       const newId = await insertVault({
         siteName: form.siteName.trim(),
         url: normalizeOptional(form.url),
@@ -126,9 +118,10 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         strengthScore: computeStrength(form.password),
         totpSecret: normalizeOptional(form.totpSecret),
       });
+      toast.show("Password saved securely ✓", "success");
       navigation.replace("PasswordDetail", { id: newId });
     } catch {
-      Alert.alert("Unable to save", "Please try again.");
+      toast.show("Unable to save. Please try again.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -137,15 +130,23 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.topBar}>
+          <Pressable onPress={() => navigation.goBack()}>
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+        </View>
         <Text style={styles.title}>Add Password</Text>
-        <Text style={styles.subtitle}>Create a secure vault entry with tags, notes, and optional 2FA secret.</Text>
+        <Text style={styles.subtitle}>
+          Encrypted on-device with AES-256-GCM before being stored.
+        </Text>
 
         <Field label="Site Name *">
           <TextInput
             value={form.siteName}
-            onChangeText={(value) => updateField("siteName", value)}
+            onChangeText={(v) => updateField("siteName", v)}
             placeholder="e.g. GitHub"
-            placeholderTextColor="#7B859B"
+            placeholderTextColor={Colors.textMuted}
             style={styles.input}
           />
         </Field>
@@ -153,75 +154,61 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         <Field label="Website URL">
           <TextInput
             value={form.url}
-            onChangeText={(value) => updateField("url", value)}
-            placeholder="https://example.com"
-            placeholderTextColor="#7B859B"
+            onChangeText={(v) => updateField("url", v)}
+            placeholder="https://github.com"
+            placeholderTextColor={Colors.textMuted}
             style={styles.input}
             autoCapitalize="none"
+            keyboardType="url"
           />
         </Field>
 
         <Field label="Username / Email *">
           <TextInput
             value={form.username}
-            onChangeText={(value) => updateField("username", value)}
-            placeholder="username@example.com"
-            placeholderTextColor="#7B859B"
+            onChangeText={(v) => updateField("username", v)}
+            placeholder="user@example.com"
+            placeholderTextColor={Colors.textMuted}
             style={styles.input}
             autoCapitalize="none"
+            keyboardType="email-address"
           />
         </Field>
 
         <Field label="Password *">
           <TextInput
             value={form.password}
-            onChangeText={(value) => updateField("password", value)}
-            placeholder="Enter password"
-            placeholderTextColor="#7B859B"
-            style={styles.input}
+            onChangeText={(v) => updateField("password", v)}
+            placeholder="Enter or generate a password"
+            placeholderTextColor={Colors.textMuted}
+            style={[styles.input, styles.monoInput]}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
           />
-          <View style={styles.row}>
-            <Pressable style={styles.linkButton} onPress={() => setShowPassword((current) => !current)}>
-              <Text style={styles.linkButtonText}>{showPassword ? "Hide" : "Show"} password</Text>
+          <View style={styles.pwRow}>
+            <Pressable style={styles.linkBtn} onPress={() => setShowPassword((v) => !v)}>
+              <Text style={styles.linkBtnText}>{showPassword ? "🙈 Hide" : "👁 Show"}</Text>
             </Pressable>
             <Pressable
-              style={styles.linkButton}
+              style={styles.linkBtn}
               onPress={() => updateField("password", generateStrongPassword(16))}
             >
-              <Text style={styles.linkButtonText}>Generate strong</Text>
+              <Text style={styles.linkBtnText}>⚡ Generate strong</Text>
             </Pressable>
           </View>
-          <View style={styles.strengthRow}>
-            {[0, 1, 2, 3, 4].map((index) => (
-              <View
-                key={index}
-                style={[
-                  styles.strengthBar,
-                  { backgroundColor: index < strength ? "#5B8DEF" : "#1B2D4D" },
-                ]}
-              />
-            ))}
-          </View>
-          <Text style={styles.metaText}>Strength: {strengthLabel}</Text>
+          <StrengthMeter score={strength} />
         </Field>
 
         <Field label="Category">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
-            {CATEGORY_OPTIONS.map((option) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
+            {CATEGORY_OPTIONS.map((opt) => (
               <Pressable
-                key={option}
-                onPress={() => updateField("category", option)}
-                style={[styles.categoryChip, form.category === option ? styles.categoryChipActive : null]}
+                key={opt}
+                onPress={() => updateField("category", opt)}
+                style={[styles.catChip, form.category === opt && styles.catChipActive]}
               >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    form.category === option ? styles.categoryChipTextActive : null,
-                  ]}
-                >
-                  {option}
+                <Text style={[styles.catChipText, form.category === opt && styles.catChipTextActive]}>
+                  {opt}
                 </Text>
               </Pressable>
             ))}
@@ -231,9 +218,9 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         <Field label="Tags (comma separated)">
           <TextInput
             value={form.tags}
-            onChangeText={(value) => updateField("tags", value)}
-            placeholder="personal, urgent, shared"
-            placeholderTextColor="#7B859B"
+            onChangeText={(v) => updateField("tags", v)}
+            placeholder="personal, work, finance"
+            placeholderTextColor={Colors.textMuted}
             style={styles.input}
           />
         </Field>
@@ -241,9 +228,9 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         <Field label="TOTP Secret (optional)">
           <TextInput
             value={form.totpSecret}
-            onChangeText={(value) => updateField("totpSecret", value)}
-            placeholder="Base32 secret"
-            placeholderTextColor="#7B859B"
+            onChangeText={(v) => updateField("totpSecret", v)}
+            placeholder="Base32 TOTP secret"
+            placeholderTextColor={Colors.textMuted}
             style={styles.input}
             autoCapitalize="characters"
           />
@@ -252,20 +239,25 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
         <Field label="Notes">
           <TextInput
             value={form.notes}
-            onChangeText={(value) => updateField("notes", value)}
-            placeholder="Additional details"
-            placeholderTextColor="#7B859B"
+            onChangeText={(v) => updateField("notes", v)}
+            placeholder="Additional details..."
+            placeholderTextColor={Colors.textMuted}
             style={[styles.input, styles.textArea]}
             multiline
             textAlignVertical="top"
           />
         </Field>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        <Pressable style={styles.primaryButton} onPress={() => void onSave()} disabled={isSaving}>
-          <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "Save Password"}</Text>
+        <Pressable
+          style={[styles.primaryButton, isSaving && styles.primaryButtonDisabled]}
+          onPress={() => void onSave()}
+          disabled={isSaving}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isSaving ? "Saving..." : "🔐 Save Password"}
+          </Text>
         </Pressable>
+
         <Pressable style={styles.secondaryButton} onPress={() => navigation.goBack()}>
           <Text style={styles.secondaryButtonText}>Cancel</Text>
         </Pressable>
@@ -284,49 +276,63 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#0B1020" },
-  container: { paddingHorizontal: 16, paddingBottom: 20, paddingTop: 10 },
-  title: { fontSize: 28, fontWeight: "700", color: "#FFFFFF", marginBottom: 4 },
-  subtitle: { fontSize: 13, color: "#8B94A8", marginBottom: 18 },
+  safeArea: { flex: 1, backgroundColor: Colors.bg },
+  container: { paddingHorizontal: 16, paddingBottom: 28, paddingTop: 6 },
+  topBar: { marginBottom: 8 },
+  backText: { color: Colors.accent, fontWeight: "700", fontSize: 14 },
+  title: { color: Colors.textPrimary, fontSize: 26, fontWeight: "700", marginBottom: 4 },
+  subtitle: { color: Colors.textSecondary, fontSize: 12, marginBottom: 18, lineHeight: 18 },
   field: { marginBottom: 14 },
-  fieldLabel: { color: "#D2DCF0", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  fieldLabel: {
+    color: Colors.textAccent,
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   input: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 10,
+    borderColor: Colors.borderInput,
+    backgroundColor: Colors.bgInput,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: "#FFFFFF",
+    color: Colors.textPrimary,
+    fontSize: 14,
   },
+  monoInput: { fontVariant: ["tabular-nums"] },
   textArea: { minHeight: 90 },
-  row: { flexDirection: "row", gap: 14, marginTop: 8 },
-  linkButton: { paddingVertical: 4 },
-  linkButtonText: { color: "#5B8DEF", fontSize: 12, fontWeight: "700" },
-  strengthRow: { flexDirection: "row", gap: 6, marginTop: 10, marginBottom: 4 },
-  strengthBar: { flex: 1, height: 5, borderRadius: 999 },
-  metaText: { color: "#8B94A8", fontSize: 12 },
-  categoryList: { gap: 8, paddingVertical: 4 },
-  categoryChip: {
+  pwRow: { flexDirection: "row", gap: 16, marginTop: 8, marginBottom: 8 },
+  linkBtn: {},
+  linkBtnText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
+  catList: { gap: 8, paddingVertical: 4 },
+  catChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 10,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  categoryChipActive: { backgroundColor: "#5B8DEF", borderColor: "#5B8DEF" },
-  categoryChipText: { color: "#8B94A8", fontSize: 12, fontWeight: "600" },
-  categoryChipTextActive: { color: "#FFFFFF" },
-  errorText: { color: "#F87171", marginBottom: 8, fontSize: 13 },
+  catChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  catChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  catChipTextActive: { color: Colors.textPrimary },
   primaryButton: {
-    borderRadius: 12,
-    backgroundColor: "#5B8DEF",
-    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    paddingVertical: 15,
     alignItems: "center",
-    marginTop: 6,
+    marginTop: 8,
+    marginBottom: 10,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  secondaryButton: { marginTop: 10, alignItems: "center", paddingVertical: 10 },
-  secondaryButtonText: { color: "#8B94A8", fontSize: 14 },
+  primaryButtonDisabled: { opacity: 0.7 },
+  primaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700" },
+  secondaryButton: { alignItems: "center", paddingVertical: 12 },
+  secondaryButtonText: { color: Colors.textSecondary, fontSize: 14 },
 });

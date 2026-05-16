@@ -9,6 +9,7 @@ import AddPasswordScreen from "../screens/AddPasswordScreen";
 import PasswordDetailScreen from "../screens/PasswordDetailScreen";
 import GeneratorScreen from "../screens/GeneratorScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import FavouritesScreen from "../screens/FavouritesScreen";
 import { getSetting } from "../database/db";
 import { clearSessionKey } from "../security/crypto";
 
@@ -20,10 +21,11 @@ export type RootStackParamList = {
   PasswordDetail: { id: number };
   Generator: undefined;
   Settings: undefined;
+  Favourites: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
-const navigationRef = createNavigationContainerRef<RootStackParamList>();
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export default function AppNavigator(): React.JSX.Element {
   const backgroundAtRef = React.useRef<number | null>(null);
@@ -87,6 +89,7 @@ export default function AppNavigator(): React.JSX.Element {
         <Stack.Screen name="Lock" component={LockScreen} />
         <Stack.Screen name="MasterPassword" component={MasterPasswordScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Favourites" component={FavouritesScreen} />
         <Stack.Screen name="AddPassword" component={AddPasswordScreen} />
         <Stack.Screen name="PasswordDetail" component={PasswordDetailScreen} />
         <Stack.Screen name="Generator" component={GeneratorScreen} />

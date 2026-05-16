@@ -11,11 +11,26 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { getVaults, type VaultRow } from "../database/db";
+import { getVaults, toggleFavourite, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import { Colors } from "../theme/colors";
+import { SiteIcon } from "../components/SiteIcon";
+import { BottomTabBar } from "../components/BottomTabBar";
+import { useToast } from "../components/Toast";
 
 type HomeScreenProps = StackScreenProps<RootStackParamList, "Home">;
 type SortMode = "recent" | "name" | "strength";
+
+const STRENGTH_COLORS = ["#EF4444", "#F97316", "#EAB308", "#84CC16", "#22C55E"];
+
+function StrengthRing({ score }: { score: number }): React.JSX.Element {
+  const color = score > 0 ? STRENGTH_COLORS[Math.min(score - 1, 4)] : Colors.strengthDim;
+  return (
+    <View style={[styles.strengthRing, { borderColor: color }]}>
+      <Text style={[styles.strengthRingText, { color }]}>{score}</Text>
+    </View>
+  );
+}
 
 export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.Element {
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
@@ -23,6 +38,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [sortMode, setSortMode] = React.useState<SortMode>("recent");
+  const toast = useToast();
 
   const loadVaults = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -38,7 +54,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
   );
 
   const categories = React.useMemo(() => {
-    const values = Array.from(new Set(vaults.map((entry) => entry.category).filter(Boolean) as string[]));
+    const values = Array.from(new Set(vaults.map((e) => e.category).filter(Boolean) as string[]));
     return values.sort((a, b) => a.localeCompare(b));
   }, [vaults]);
 
@@ -64,10 +80,25 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
     return [...filtered].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   }, [vaults, searchQuery, selectedCategory, sortMode]);
 
+  // Health stats
   const totalWeak = React.useMemo(
-    () => vaults.filter((item) => (item.strength_score ?? 0) < 3).length,
+    () => vaults.filter((v) => (v.strength_score ?? 0) < 3).length,
     [vaults],
   );
+  const totalStrong = React.useMemo(
+    () => vaults.filter((v) => (v.strength_score ?? 0) >= 4).length,
+    [vaults],
+  );
+  const healthPercent = vaults.length > 0 ? Math.round((totalStrong / vaults.length) * 100) : 0;
+
+  const handleToggleFavourite = async (item: VaultRow): Promise<void> => {
+    const newVal = item.favourite === 1 ? 0 : 1;
+    await toggleFavourite(item.id, newVal as 0 | 1);
+    setVaults((current) =>
+      current.map((v) => (v.id === item.id ? { ...v, favourite: newVal } : v)),
+    );
+    toast.show(newVal === 1 ? "Added to starred ⭐" : "Removed from starred", newVal === 1 ? "success" : "info");
+  };
 
   const renderSortButton = (mode: SortMode, label: string): React.JSX.Element => (
     <Pressable
@@ -75,7 +106,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
       style={[styles.sortChip, sortMode === mode ? styles.sortChipActive : null]}
       onPress={() => setSortMode(mode)}
     >
-      <Text style={[styles.sortChipText, sortMode === mode ? styles.sortChipTextActive : null]}>{label}</Text>
+      <Text style={[styles.sortChipText, sortMode === mode ? styles.sortChipTextActive : null]}>
+        {label}
+      </Text>
     </Pressable>
   );
 
@@ -87,30 +120,73 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
             <Text style={styles.title}>My Vault</Text>
             <Text style={styles.subtitle}>{vaults.length} saved credentials</Text>
           </View>
-          <Pressable style={styles.iconButton} onPress={() => navigation.navigate("Settings")}>
-            <Text style={styles.iconButtonText}>⚙</Text>
-          </Pressable>
         </View>
 
-        <View style={styles.statsCard}>
-          <Text style={styles.statsMain}>
-            Security Check: <Text style={styles.statsStrong}>{totalWeak}</Text> weak password(s)
-          </Text>
-          <Text style={styles.statsSub}>Tip: Open Generator to replace weak passwords quickly.</Text>
-          <Pressable style={styles.inlineButton} onPress={() => navigation.navigate("Generator")}>
-            <Text style={styles.inlineButtonText}>Open Generator</Text>
-          </Pressable>
-        </View>
+        {/* Health dashboard */}
+        {vaults.length > 0 ? (
+          <View style={styles.healthCard}>
+            <View style={styles.healthLeft}>
+              <Text style={styles.healthTitle}>Security Health</Text>
+              <Text style={styles.healthSub}>
+                {totalStrong}/{vaults.length} strong passwords
+              </Text>
+              {totalWeak > 0 ? (
+                <Pressable
+                  style={styles.healthAction}
+                  onPress={() => navigation.navigate("Generator")}
+                >
+                  <Text style={styles.healthActionText}>
+                    ⚠ {totalWeak} weak — fix now
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.healthGood}>✓ All passwords are strong!</Text>
+              )}
+            </View>
+            <View style={styles.healthRingWrap}>
+              <View
+                style={[
+                  styles.healthRing,
+                  {
+                    borderColor:
+                      healthPercent >= 80
+                        ? Colors.success
+                        : healthPercent >= 50
+                          ? Colors.warning
+                          : Colors.error,
+                  },
+                ]}
+              >
+                <Text style={styles.healthPercent}>{healthPercent}%</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.emptyHero}>
+            <Text style={styles.emptyHeroEmoji}>🔐</Text>
+            <Text style={styles.emptyHeroTitle}>Start building your vault</Text>
+            <Text style={styles.emptyHeroSub}>
+              All passwords are encrypted on-device. Nothing leaves your phone.
+            </Text>
+            <Pressable
+              style={styles.emptyHeroCTA}
+              onPress={() => navigation.navigate("AddPassword")}
+            >
+              <Text style={styles.emptyHeroCTAText}>+ Add your first password</Text>
+            </Pressable>
+          </View>
+        )}
 
         <TextInput
           style={styles.searchInput}
           placeholder="Search by site, username, URL, tags..."
-          placeholderTextColor="#7B859B"
+          placeholderTextColor={Colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
         />
 
+        {/* Category chips */}
         <FlatList
           data={[
             { key: "all", value: null as string | null, label: `All (${vaults.length})` },
@@ -141,15 +217,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
           )}
         />
 
+        {/* Sort */}
         <View style={styles.sortRow}>
           {renderSortButton("recent", "Recent")}
-          {renderSortButton("name", "Name")}
+          {renderSortButton("name", "A–Z")}
           {renderSortButton("strength", "Strength")}
         </View>
 
+        {/* List */}
         {isLoading ? (
           <View style={styles.loaderWrap}>
-            <ActivityIndicator size="large" color="#5B8DEF" />
+            <ActivityIndicator size="large" color={Colors.accent} />
           </View>
         ) : (
           <FlatList
@@ -158,252 +236,193 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>No passwords found</Text>
-                <Text style={styles.emptySubtitle}>Try a new filter or add your first password.</Text>
-              </View>
+              vaults.length > 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyTitle}>No matches</Text>
+                  <Text style={styles.emptySubtitle}>Try a different search or filter.</Text>
+                </View>
+              ) : null
             }
             renderItem={({ item }) => (
               <Pressable
-                style={styles.card}
+                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                 onPress={() => navigation.navigate("PasswordDetail", { id: item.id })}
               >
                 <View style={styles.cardRow}>
+                  <SiteIcon siteName={item.site_name} size={46} />
                   <View style={styles.cardMain}>
                     <Text style={styles.cardTitle}>{item.site_name}</Text>
                     <Text style={styles.cardMeta}>{item.username}</Text>
-                    {item.url ? <Text style={styles.cardMetaAlt}>{item.url}</Text> : null}
+                    {item.url ? (
+                      <Text style={styles.cardMetaAlt} numberOfLines={1}>
+                        {item.url}
+                      </Text>
+                    ) : null}
+                    {item.category ? (
+                      <Text style={styles.categoryBadge}>{item.category}</Text>
+                    ) : null}
                   </View>
                   <View style={styles.cardRight}>
-                    <Text style={styles.categoryBadge}>{item.category ?? "General"}</Text>
-                    <Text style={styles.strengthText}>
-                      Strength: {item.strength_score !== null ? `${item.strength_score}/5` : "N/A"}
-                    </Text>
+                    <Pressable
+                      onPress={() => void handleToggleFavourite(item)}
+                      hitSlop={10}
+                      style={styles.starBtn}
+                    >
+                      <Text style={{ fontSize: 18, opacity: item.favourite ? 1 : 0.28 }}>⭐</Text>
+                    </Pressable>
+                    <StrengthRing score={item.strength_score ?? 0} />
                   </View>
                 </View>
               </Pressable>
             )}
           />
         )}
-
-        <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddPassword")}>
-          <Text style={styles.addButtonText}>+ Add Password</Text>
-        </Pressable>
       </View>
+
+      <BottomTabBar
+        activeTab="Vault"
+        onTabPress={(tab) => {
+          if (tab === "Favourites") navigation.navigate("Favourites");
+          else if (tab === "Generator") navigation.navigate("Generator");
+          else if (tab === "Settings") navigation.navigate("Settings");
+        }}
+        onAddPress={() => navigation.navigate("AddPassword")}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#0B1020",
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
+  safeArea: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
   },
-  title: {
-    color: "#FFFFFF",
-    fontSize: 28,
-    fontWeight: "700",
+  title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700" },
+  subtitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
+  healthCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.accentBorder,
+    backgroundColor: Colors.accentBg,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
-  subtitle: {
-    color: "#8B94A8",
-    fontSize: 13,
-    marginTop: 2,
-  },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+  healthLeft: { flex: 1 },
+  healthTitle: { color: Colors.textPrimary, fontWeight: "700", fontSize: 14, marginBottom: 2 },
+  healthSub: { color: Colors.textAccent, fontSize: 12, marginBottom: 6 },
+  healthAction: { alignSelf: "flex-start" },
+  healthActionText: { color: Colors.warning, fontSize: 12, fontWeight: "700" },
+  healthGood: { color: Colors.success, fontSize: 12, fontWeight: "700" },
+  healthRingWrap: { alignItems: "center", justifyContent: "center" },
+  healthRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
   },
-  iconButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-  },
-  statsCard: {
-    borderRadius: 12,
+  healthPercent: { color: Colors.textPrimary, fontWeight: "700", fontSize: 14 },
+  emptyHero: {
+    alignItems: "center",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(91,141,239,0.5)",
-    backgroundColor: "rgba(91,141,239,0.16)",
-    padding: 12,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+    padding: 24,
     marginBottom: 12,
   },
-  statsMain: {
-    color: "#E7EEFF",
-    fontSize: 13,
+  emptyHeroEmoji: { fontSize: 40, marginBottom: 10 },
+  emptyHeroTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: 6 },
+  emptyHeroSub: { color: Colors.textSecondary, fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 14 },
+  emptyHeroCTA: {
+    backgroundColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
   },
-  statsStrong: {
-    fontWeight: "700",
-  },
-  statsSub: {
-    marginTop: 4,
-    color: "#A5B4D6",
-    fontSize: 12,
-  },
-  inlineButton: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-  },
-  inlineButtonText: {
-    color: "#BED3FF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
+  emptyHeroCTAText: { color: Colors.textPrimary, fontWeight: "700", fontSize: 14 },
   searchInput: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    color: "#FFFFFF",
+    borderColor: Colors.borderInput,
+    backgroundColor: Colors.bgInput,
+    color: Colors.textPrimary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 8,
+    fontSize: 14,
   },
-  categoryList: {
-    gap: 8,
-    paddingVertical: 8,
-  },
+  categoryList: { gap: 8, paddingVertical: 6 },
   categoryChip: {
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  categoryChipActive: {
-    backgroundColor: "#5B8DEF",
-    borderColor: "#5B8DEF",
-  },
-  categoryChipText: {
-    color: "#8B94A8",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  categoryChipTextActive: {
-    color: "#FFFFFF",
-  },
-  sortRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginVertical: 8,
-  },
-  sortChip: {
-    borderRadius: 8,
+    paddingVertical: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  categoryChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  categoryChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  categoryChipTextActive: { color: Colors.textPrimary },
+  sortRow: { flexDirection: "row", gap: 8, marginVertical: 8 },
+  sortChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  sortChipActive: {
-    backgroundColor: "rgba(91,141,239,0.28)",
-    borderColor: "#5B8DEF",
-  },
-  sortChipText: {
-    color: "#8B94A8",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  sortChipTextActive: {
-    color: "#DCE8FF",
-  },
-  loaderWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  listContent: {
-    paddingBottom: 18,
-    gap: 10,
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 30,
-  },
-  emptyTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  emptySubtitle: {
-    color: "#8B94A8",
-    fontSize: 13,
-  },
+  sortChipActive: { backgroundColor: Colors.accentBg, borderColor: Colors.accent },
+  sortChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  sortChipTextActive: { color: Colors.textAccent },
+  loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  listContent: { paddingBottom: 16, gap: 10 },
+  emptyState: { alignItems: "center", paddingVertical: 30 },
+  emptyTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 6 },
+  emptySubtitle: { color: Colors.textSecondary, fontSize: 13 },
   card: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    padding: 12,
-    marginBottom: 10,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+    padding: 14,
   },
-  cardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  cardMain: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 3,
-  },
-  cardMeta: {
-    color: "#9CA9C6",
-    fontSize: 13,
-  },
-  cardMetaAlt: {
-    color: "#7683A2",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  cardRight: {
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-  },
+  cardPressed: { backgroundColor: Colors.bgCardHover },
+  cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  cardMain: { flex: 1 },
+  cardTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  cardMeta: { color: Colors.textSecondary, fontSize: 13 },
+  cardMetaAlt: { color: Colors.textMuted, fontSize: 11, marginTop: 2 },
   categoryBadge: {
-    color: "#D7E5FF",
-    backgroundColor: "rgba(91,141,239,0.2)",
+    marginTop: 5,
+    alignSelf: "flex-start",
+    color: Colors.accentBright,
+    backgroundColor: Colors.accentDim,
     borderRadius: 999,
-    overflow: "hidden",
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    fontSize: 11,
-  },
-  strengthText: {
-    color: "#A8B5CF",
-    fontSize: 11,
-  },
-  addButton: {
-    borderRadius: 12,
-    backgroundColor: "#5B8DEF",
-    paddingVertical: 14,
-    alignItems: "center",
-    marginVertical: 12,
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+    paddingVertical: 2,
+    fontSize: 10,
     fontWeight: "700",
+    overflow: "hidden",
   },
+  cardRight: { alignItems: "center", gap: 8 },
+  starBtn: { padding: 2 },
+  strengthRing: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  strengthRingText: { fontSize: 11, fontWeight: "700" },
 });
