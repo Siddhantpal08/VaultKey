@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { createMasterMeta, setSessionFromMaster, verifyMasterPassword } from "../security/crypto";
+import { createMasterMeta, persistSessionKey, setSessionFromMaster, verifyMasterPassword } from "../security/crypto";
 import { Colors } from "../theme/colors";
 import { StrengthMeter } from "../components/StrengthMeter";
 
@@ -94,6 +95,7 @@ export default function MasterPasswordScreen({
         await upsertSetting(MASTER_PASSWORD_META_KEY, meta);
         await upsertSetting(MASTER_PASSWORD_KEY, "");
         await setSessionFromMaster(password, meta);
+        await persistSessionKey(); // cache for instant future unlocks
       } else {
         const existingMeta = masterMeta ?? (await getSetting(MASTER_PASSWORD_META_KEY));
         const existingLegacy = await getSetting(MASTER_PASSWORD_KEY);
@@ -114,6 +116,7 @@ export default function MasterPasswordScreen({
         } else if (existingMeta) {
           await setSessionFromMaster(password, existingMeta);
         }
+        await persistSessionKey(); // cache for instant future unlocks
       }
       
       const pinHash = await getSetting("pin_hash");
@@ -142,14 +145,15 @@ export default function MasterPasswordScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
         <View style={styles.headerIcon}>
-          <Ionicons 
-            name={isSetupMode ? "shield-checkmark" : "key"} 
-            size={30} 
-            color={Colors.accent} 
-          />
+          <Text style={styles.logoVK}>VK</Text>
+          <View style={styles.logoBar} />
         </View>
         <Text style={styles.title}>
           {isSetupMode ? "Create Master Password" : "Verify Identity"}
@@ -245,7 +249,7 @@ export default function MasterPasswordScreen({
           </Text>
           <Text style={styles.watermarkSub}>Provided by Crevio Studio</Text>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -254,8 +258,9 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 22,
+    paddingVertical: 32,
     justifyContent: "center",
   },
   headerIcon: {
@@ -357,6 +362,21 @@ const styles = StyleSheet.create({
   },
   secondaryButton: { alignItems: "center", paddingVertical: 12 },
   secondaryButtonText: { color: Colors.textSecondary, fontSize: 14 },
+  logoVK: {
+    color: Colors.accent,
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: 2,
+    lineHeight: 26,
+  },
+  logoBar: {
+    width: 20,
+    height: 2.5,
+    borderRadius: 999,
+    backgroundColor: Colors.accentBright,
+    opacity: 0.7,
+    marginTop: 2,
+  },
   hint: {
     marginTop: 16,
     color: Colors.warning,

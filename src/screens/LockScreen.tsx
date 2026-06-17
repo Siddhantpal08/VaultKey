@@ -6,16 +6,16 @@ import {
   Alert,
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getPINHash, getSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { hasSessionKey } from "../security/crypto";
+import { hasSessionKey, restoreSessionKey } from "../security/crypto";
 import { Colors } from "../theme/colors";
 // @ts-ignore noble hashes resolution
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -30,6 +30,62 @@ function hashPIN(pin: string): string {
   return Buffer.from(hash).toString("base64");
 }
 
+/** Inline VK logo using pure RN primitives — no external image needed. */
+function VKLogo(): React.JSX.Element {
+  return (
+    <View style={logo.outer}>
+      <View style={logo.ring} />
+      <View style={logo.inner}>
+        <Text style={logo.vk}>VK</Text>
+        {/* small key-bit accent bar below */}
+        <View style={logo.keyBar} />
+      </View>
+    </View>
+  );
+}
+
+const logo = StyleSheet.create({
+  outer: {
+    width: 100,
+    height: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ring: {
+    position: "absolute",
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    borderWidth: 2,
+    borderColor: "rgba(91,141,239,0.25)",
+  },
+  inner: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(91,141,239,0.14)",
+    borderWidth: 1.5,
+    borderColor: "rgba(91,141,239,0.45)",
+    gap: 2,
+  },
+  vk: {
+    color: Colors.accent,
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 2,
+    lineHeight: 30,
+  },
+  keyBar: {
+    width: 22,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: Colors.accentBright,
+    opacity: 0.7,
+  },
+});
+
 export default function LockScreen({ navigation }: LockScreenProps): React.JSX.Element {
   const [attemptsLeft, setAttemptsLeft] = useState<number>(MAX_ATTEMPTS);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState<boolean>(false);
@@ -42,6 +98,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [storedPINHash, setStoredPINHash] = useState<string | null>(null);
   const [hasPIN, setHasPIN] = useState<boolean>(false);
+  const [requireMasterOnUnlock, setRequireMasterOnUnlock] = useState<boolean>(false);
 
   // Pulse animation for the icon ring
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -63,6 +120,24 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     const pinHash = await getPINHash();
     setStoredPINHash(pinHash);
     setHasPIN(pinHash !== null);
+
+    const requireMaster = (await getSetting("require_master_on_unlock")) === "true";
+    setRequireMasterOnUnlock(requireMaster);
+
+    // ─── Fast auto-unlock path ───────────────────────────────────────────────
+    // When "require master password every unlock" is OFF, we attempt to restore
+    // the session key from the OS secure enclave (Android Keystore / iOS Keychain).
+    // If it's there, go straight to Home — no biometric prompt, no master password.
+    // This is the fast path after background timeouts cleared the in-memory key.
+    if (!requireMaster && !hasSessionKey()) {
+      const restored = await restoreSessionKey();
+      if (restored) {
+        navigation.replace("Home");
+        return;
+      }
+      // Key not in SecureStore yet → fall through to show normal lock UI
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -87,7 +162,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     setMaxAttempts(normalizedMaxAttempts);
     setLockoutMinutes(Number.isFinite(lockoutSetting) ? Math.max(1, lockoutSetting) : 10);
     setAttemptsLeft((current) => Math.min(current, normalizedMaxAttempts));
-  }, []);
+  }, [navigation]);
 
   useEffect(() => {
     void checkBiometricSupport();
@@ -121,10 +196,21 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     [],
   );
 
-  const onAuthSuccess = (): void => {
-    if (!hasSessionKey()) {
+  const onAuthSuccess = async (): Promise<void> => {
+    // If master password is required every time, always re-authenticate
+    if (requireMasterOnUnlock) {
       navigation.replace("MasterPassword");
       return;
+    }
+    // Fast path: restore the key from SecureStore (Android Keystore / iOS Keychain)
+    // This is instant and doesn't require re-running PBKDF2.
+    if (!hasSessionKey()) {
+      const restored = await restoreSessionKey();
+      if (!restored) {
+        // Key not cached yet (first install / vault reset) — fall back to master password
+        navigation.replace("MasterPassword");
+        return;
+      }
     }
     navigation.replace("Home");
   };
@@ -154,7 +240,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
       });
 
       if (result.success) {
-        onAuthSuccess();
+        void onAuthSuccess();
         return;
       }
 
@@ -170,15 +256,13 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   const verifyPin = (candidatePin: string): void => {
     const candidateHash = hashPIN(candidatePin);
 
-    // If no custom PIN has been set, show a prompt to set one in Settings.
     if (!hasPIN || !storedPINHash) {
-      // Fallback: allow any 4-digit PIN as first-time access but push to master password
       navigation.navigate("MasterPassword");
       return;
     }
 
     if (candidateHash === storedPINHash) {
-      onAuthSuccess();
+      void onAuthSuccess();
       return;
     }
 
@@ -216,17 +300,32 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
         <View style={styles.blobBottom} />
       </View>
 
-      <View style={styles.container}>
-        {/* Icon with pulse ring */}
-        <View style={styles.iconWrapper}>
-          <Animated.View style={[styles.iconRing, { transform: [{ scale: pulseAnim }] }]} />
-          <View style={styles.iconCircle}>
-            <Ionicons name="lock-closed" size={40} color={Colors.accent} />
-          </View>
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Logo */}
+        <Animated.View style={[styles.logoWrap, { transform: [{ scale: pulseAnim }] }]}>
+          <VKLogo />
+        </Animated.View>
 
         <Text style={styles.title}>VaultKey</Text>
         <Text style={styles.subtitle}>Your secure local vault</Text>
+
+        {/* Require master password every time — shortcut banner */}
+        {requireMasterOnUnlock ? (
+          <Pressable
+            style={styles.masterRequiredBanner}
+            onPress={() => navigation.navigate("MasterPassword")}
+          >
+            <Ionicons name="key" size={14} color={Colors.accent} />
+            <Text style={styles.masterRequiredText}>
+              Master password required every unlock
+            </Text>
+            <Ionicons name="chevron-forward" size={13} color={Colors.accent} />
+          </Pressable>
+        ) : null}
 
         {attemptsLeft < maxAttempts ? (
           <View style={styles.attemptBox}>
@@ -266,10 +365,10 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
                 onPress={() => void handleBiometricUnlock()}
                 disabled={isAuthenticating}
               >
-                <Ionicons 
-                  name={biometricLabel === "Face ID" ? "scan" : "finger-print"} 
-                  size={20} 
-                  color={Colors.textPrimary} 
+                <Ionicons
+                  name={biometricLabel === "Face ID" ? "scan" : "finger-print"}
+                  size={20}
+                  color={Colors.textPrimary}
                 />
                 <Text style={styles.biometricButtonText}>
                   {isAuthenticating ? "Authenticating..." : `Unlock with ${biometricLabel}`}
@@ -344,7 +443,16 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
             </View>
           </>
         )}
-      </View>
+
+        {/* Watermark */}
+        <View style={styles.watermarkContainer}>
+          <Text style={styles.watermarkText}>VaultKey</Text>
+          <Text style={styles.watermarkText}>
+            Created by <Text style={styles.watermarkHighlight}>Siddhant Pal</Text>
+          </Text>
+          <Text style={styles.watermarkSub}>Provided by Crevio Studio</Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -377,36 +485,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.blobPurple,
     opacity: 0.1,
   },
-  container: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
+    paddingVertical: 32,
   },
-  iconWrapper: {
-    marginBottom: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    width: 100,
-    height: 100,
-  },
-  iconCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(91,141,239,0.18)",
-    borderWidth: 1.5,
-    borderColor: "rgba(91,141,239,0.4)",
-  },
-  iconRing: {
-    position: "absolute",
-    width: 106,
-    height: 106,
-    borderRadius: 53,
-    borderWidth: 2,
-    borderColor: "rgba(91,141,239,0.25)",
+  logoWrap: {
+    marginBottom: 20,
   },
   title: {
     color: Colors.textPrimary,
@@ -509,4 +596,46 @@ const styles = StyleSheet.create({
   deleteButtonText: { color: Colors.textSecondary, fontSize: 14 },
   masterPasswordButton: { marginTop: 8, alignItems: "center", paddingVertical: 12 },
   masterPasswordButtonText: { color: Colors.accent, fontSize: 14, fontWeight: "600" },
+  masterRequiredBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.accentBg,
+    borderWidth: 1,
+    borderColor: Colors.accentBorder,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    width: "100%",
+    maxWidth: 360,
+  },
+  masterRequiredText: {
+    flex: 1,
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  watermarkContainer: {
+    alignItems: "center",
+    marginTop: 36,
+    opacity: 0.5,
+  },
+  watermarkText: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  watermarkHighlight: {
+    color: Colors.accent,
+    fontWeight: "700",
+  },
+  watermarkSub: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
 });

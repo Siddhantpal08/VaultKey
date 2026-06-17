@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import { upsertSetting } from "../database/db";
+// @ts-ignore noble hashes resolution
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Buffer } from "buffer";
 import { useToast } from "./Toast";

@@ -13,7 +13,7 @@ import * as SecureStore from "expo-secure-store";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { Colors } from "../theme/colors";
 import { getDatabase } from "../database/db";
-import { clearSessionKey } from "../security/crypto";
+import { clearPersistedSessionKey } from "../security/crypto";
 import { useToast } from "../components/Toast";
 
 type Props = StackScreenProps<RootStackParamList, "ForgotPassword">;
@@ -37,11 +37,8 @@ export default function ForgotPasswordScreen({ navigation }: Props): React.JSX.E
       await db.runAsync("DELETE FROM vaults");
       await db.runAsync("DELETE FROM settings");
 
-      // Clear secure store
-      await SecureStore.deleteItemAsync("session_key_cache"); // Just in case
-
-      // Clear runtime memory
-      clearSessionKey();
+      // Clear secure store (cached session key)
+      await clearPersistedSessionKey();
 
       toast.show("Vault completely reset.", "success");
 

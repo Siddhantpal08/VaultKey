@@ -50,6 +50,7 @@ type SettingsState = {
   biometricsEnabled: boolean;
   autoLockOnBackground: boolean;
   breachCheckEnabled: boolean;
+  requireMasterOnUnlock: boolean;
   lockTimeoutMinutes: number;
   maxFailedAttempts: number;
   lockoutMinutes: number;
@@ -60,6 +61,7 @@ const KEYS = {
   biometricsEnabled: "biometrics_enabled",
   autoLockOnBackground: "auto_lock_background",
   breachCheckEnabled: "breach_check_enabled",
+  requireMasterOnUnlock: "require_master_on_unlock",
   lockTimeoutMinutes: "lock_timeout_minutes",
   maxFailedAttempts: "max_failed_attempts",
   lockoutMinutes: "lockout_minutes",
@@ -86,6 +88,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
     biometricsEnabled: true,
     autoLockOnBackground: true,
     breachCheckEnabled: false,
+    requireMasterOnUnlock: false,
     lockTimeoutMinutes: 5,
     maxFailedAttempts: 5,
     lockoutMinutes: 10,
@@ -118,6 +121,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         biometricsEnabled: (map.get(KEYS.biometricsEnabled) ?? "true") === "true",
         autoLockOnBackground: (map.get(KEYS.autoLockOnBackground) ?? "true") === "true",
         breachCheckEnabled: (map.get(KEYS.breachCheckEnabled) ?? "false") === "true",
+        requireMasterOnUnlock: (map.get(KEYS.requireMasterOnUnlock) ?? "false") === "true",
         lockTimeoutMinutes: Number(map.get(KEYS.lockTimeoutMinutes) ?? "5"),
         maxFailedAttempts: Number(map.get(KEYS.maxFailedAttempts) ?? "5"),
         lockoutMinutes: Number(map.get(KEYS.lockoutMinutes) ?? "10"),
@@ -134,6 +138,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
     await upsertSetting(KEYS.biometricsEnabled, boolToString(next.biometricsEnabled));
     await upsertSetting(KEYS.autoLockOnBackground, boolToString(next.autoLockOnBackground));
     await upsertSetting(KEYS.breachCheckEnabled, boolToString(next.breachCheckEnabled));
+    await upsertSetting(KEYS.requireMasterOnUnlock, boolToString(next.requireMasterOnUnlock));
     await upsertSetting(KEYS.lockTimeoutMinutes, String(next.lockTimeoutMinutes));
     await upsertSetting(KEYS.maxFailedAttempts, String(next.maxFailedAttempts));
     await upsertSetting(KEYS.lockoutMinutes, String(next.lockoutMinutes));
@@ -376,6 +381,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
             sub="Lock when app leaves foreground"
             value={state.autoLockOnBackground}
             onPress={() => void update({ autoLockOnBackground: !state.autoLockOnBackground })}
+          />
+          <ToggleRow
+            label="Always require master password"
+            sub="Skip PIN/biometrics, ask master password every time"
+            value={state.requireMasterOnUnlock}
+            onPress={() => void update({ requireMasterOnUnlock: !state.requireMasterOnUnlock })}
           />
           <ToggleRow
             label="Breach check hints"
