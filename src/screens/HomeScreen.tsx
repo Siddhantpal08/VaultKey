@@ -123,6 +123,13 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
             <Text style={styles.title}>My Vault</Text>
             <Text style={styles.subtitle}>{vaults.length} saved credentials</Text>
           </View>
+          <Pressable
+            style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+            onPress={() => void loadVaults()}
+            hitSlop={8}
+          >
+            <Ionicons name="refresh" size={20} color={Colors.accent} />
+          </Pressable>
         </View>
 
         {/* Health dashboard */}
@@ -318,6 +325,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
+  reloadBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(91,141,239,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(91,141,239,0.25)",
+  },
+  reloadBtnPressed: { backgroundColor: "rgba(91,141,239,0.25)" },
   title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700" },
   subtitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
   healthCard: {

@@ -190,17 +190,19 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
           />
           <View style={styles.pwRow}>
             <Pressable style={styles.linkBtn} onPress={() => setShowPassword((v) => !v)}>
-              <Text style={styles.linkBtnText}>
-                <Ionicons name={showPassword ? "eye-off" : "eye"} size={14} /> {showPassword ? "Hide" : "Show"}
-              </Text>
+              <View style={styles.linkBtnInner}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color={Colors.accent} />
+                <Text style={styles.linkBtnText}>{showPassword ? "Hide" : "Show"}</Text>
+              </View>
             </Pressable>
             <Pressable
               style={styles.linkBtn}
               onPress={() => updateField("password", generateStrongPassword(16))}
             >
-              <Text style={styles.linkBtnText}>
-                <Ionicons name="flash" size={14} /> Generate strong
-              </Text>
+              <View style={styles.linkBtnInner}>
+                <Ionicons name="flash" size={18} color={Colors.accent} />
+                <Text style={styles.linkBtnText}>Generate strong</Text>
+              </View>
             </Pressable>
           </View>
           <StrengthMeter score={strength} />
@@ -318,9 +320,10 @@ const styles = StyleSheet.create({
   },
   monoInput: { fontVariant: ["tabular-nums"] },
   textArea: { minHeight: 90 },
-  pwRow: { flexDirection: "row", gap: 16, marginTop: 8, marginBottom: 8 },
+  pwRow: { flexDirection: "row", gap: 16, marginTop: 10, marginBottom: 8 },
   linkBtn: {},
-  linkBtnText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
+  linkBtnInner: { flexDirection: "row", alignItems: "center", gap: 5 },
+  linkBtnText: { color: Colors.accent, fontSize: 14, fontWeight: "700" },
   catList: { gap: 8, paddingVertical: 4 },
   catChip: {
     borderRadius: 999,

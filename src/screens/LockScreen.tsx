@@ -124,19 +124,8 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     const requireMaster = (await getSetting("require_master_on_unlock")) === "true";
     setRequireMasterOnUnlock(requireMaster);
 
-    // ─── Fast auto-unlock path ───────────────────────────────────────────────
-    // When "require master password every unlock" is OFF, we attempt to restore
-    // the session key from the OS secure enclave (Android Keystore / iOS Keychain).
-    // If it's there, go straight to Home — no biometric prompt, no master password.
-    // This is the fast path after background timeouts cleared the in-memory key.
-    if (!requireMaster && !hasSessionKey()) {
-      const restored = await restoreSessionKey();
-      if (restored) {
-        navigation.replace("Home");
-        return;
-      }
-      // Key not in SecureStore yet → fall through to show normal lock UI
-    }
+    // ─── No auto-bypass: always show PIN / biometric UI ─────────────────────
+    // The session key is restored AFTER successful auth inside onAuthSuccess().
     // ─────────────────────────────────────────────────────────────────────────
 
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -202,7 +191,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
       navigation.replace("MasterPassword");
       return;
     }
-    // Fast path: restore the key from SecureStore (Android Keystore / iOS Keychain)
+    // Restore the session key from SecureStore (Android Keystore / iOS Keychain).
     // This is instant and doesn't require re-running PBKDF2.
     if (!hasSessionKey()) {
       const restored = await restoreSessionKey();
