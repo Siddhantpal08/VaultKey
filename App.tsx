@@ -1,14 +1,18 @@
 import "react-native-get-random-values";
 import React from "react";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View, AppState, type AppStateStatus } from "react-native";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { initializeDatabase } from "./src/database/db";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "./src/components/Toast";
+import { BlurView } from "expo-blur";
+import * as ScreenCapture from "expo-screen-capture";
+import { VKLogo } from "./src/components/VKLogo";
 
 export default function App(): React.JSX.Element {
   const [isReady, setIsReady] = React.useState(false);
+  const [isBackground, setIsBackground] = React.useState(false);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -23,8 +27,27 @@ export default function App(): React.JSX.Element {
 
     void bootstrap();
 
+    // Enable native screen capture protection and App Switcher blur on iOS
+    const enableProtection = async () => {
+      try {
+        await ScreenCapture.preventScreenCaptureAsync();
+        await ScreenCapture.enableAppSwitcherProtectionAsync(0.85);
+      } catch (err) {
+        console.warn("Failed to enable screen protection:", err);
+      }
+    };
+    void enableProtection();
+
+    // Listen to AppState transitions to toggle JS-level blur overlay
+    const handleAppStateChange = (nextState: AppStateStatus): void => {
+      setIsBackground(nextState === "inactive" || nextState === "background");
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+
     return () => {
       isMounted = false;
+      subscription.remove();
     };
   }, []);
 
@@ -42,6 +65,12 @@ export default function App(): React.JSX.Element {
       <ToastProvider>
         <StatusBar style="light" />
         <AppNavigator />
+        {isBackground && (
+          <View style={styles.overlay}>
+            <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+            <VKLogo />
+          </View>
+        )}
       </ToastProvider>
     </SafeAreaProvider>
   );
@@ -53,5 +82,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0B1020",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(6, 11, 23, 0.4)",
   },
 });
