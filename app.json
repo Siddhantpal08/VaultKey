@@ -12,7 +12,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/66907c99-a0b4-48a7-b2fc-80608524eb42"
+      "url": ""
     },
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -53,7 +53,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "66907c99-a0b4-48a7-b2fc-80608524eb42"
+        "projectId": ""
       }
     }
   }
