@@ -276,7 +276,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
                 username: row.username, encrypted_password: row.encrypted_password,
                 category: row.category, notes: row.notes, tags: row.tags,
                 strength_score: row.strength_score, totp_secret: row.totp_secret,
-                favourite: 0, is_note: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+                favourite: 0, is_note: 0, deleted_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
               });
             }
           }
@@ -540,6 +540,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
             <Text style={styles.primaryButtonText}>
               {changingMaster ? "Rotating..." : "Update Master Password"}
             </Text>
+          </Pressable>
+        </SectionCard>
+
+        {/* Advanced Tools */}
+        <SectionCard title="Advanced Tools" icon="construct">
+          <Pressable style={styles.primaryButton} onPress={() => navigation.navigate("Audit")}>
+            <Text style={styles.primaryButtonText}>Security Audit</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => navigation.navigate("Trash")}>
+            <Text style={styles.secondaryButtonText}>Recently Deleted (Trash)</Text>
           </Pressable>
         </SectionCard>
 

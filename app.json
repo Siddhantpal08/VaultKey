@@ -5,6 +5,7 @@
     "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "vaultkey",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "runtimeVersion": {
@@ -30,14 +31,25 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.siddhantpal.VaultKey"
+      "package": "com.siddhantpal.VaultKey",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            { "scheme": "file", "mimeType": "*/*", "pathPattern": ".*\\.pnb" },
+            { "scheme": "content", "mimeType": "*/*", "pathPattern": ".*\\.pnb" }
+          ],
+          "category": ["DEFAULT", "BROWSABLE"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-share-intent"
     ],
     "extra": {
       "eas": {

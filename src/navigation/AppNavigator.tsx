@@ -14,8 +14,11 @@ import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import NotesScreen from "../screens/NotesScreen";
 import AddNoteScreen from "../screens/AddNoteScreen";
 import NoteDetailScreen from "../screens/NoteDetailScreen";
+import TrashScreen from "../screens/TrashScreen";
+import AuditScreen from "../screens/AuditScreen";
 import { getSetting } from "../database/db";
 import { clearSessionKey } from "../security/crypto";
+import { useShareIntent } from "expo-share-intent";
 
 export type RootStackParamList = {
   Lock: undefined;
@@ -28,8 +31,10 @@ export type RootStackParamList = {
   Favourites: undefined;
   ForgotPassword: undefined;
   Notes: undefined;
-  AddNote: undefined;
+  AddNote: { initialTitle?: string; initialContent?: string; isFile?: boolean } | undefined;
   NoteDetail: { id: number };
+  Trash: undefined;
+  Audit: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -37,6 +42,27 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export default function AppNavigator(): React.JSX.Element {
   const backgroundAtRef = React.useRef<number | null>(null);
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+
+  React.useEffect(() => {
+    if (hasShareIntent && navigationRef.isReady()) {
+      const route = navigationRef.getCurrentRoute();
+      if (route && route.name !== "Lock" && route.name !== "MasterPassword") {
+        let initialTitle = shareIntent.meta?.title || "Shared Content";
+        let initialContent = shareIntent.text || "";
+        let isFile = false;
+        
+        if (shareIntent.files && shareIntent.files.length > 0) {
+          initialContent = shareIntent.files[0].path;
+          initialTitle = shareIntent.files[0].fileName || initialTitle;
+          isFile = true;
+        }
+        
+        navigationRef.navigate("AddNote", { initialTitle, initialContent, isFile });
+        resetShareIntent();
+      }
+    }
+  }, [hasShareIntent, shareIntent]);
 
   React.useEffect(() => {
     const onAppStateChange = async (nextState: AppStateStatus): Promise<void> => {
@@ -120,6 +146,8 @@ export default function AppNavigator(): React.JSX.Element {
         <Stack.Screen name="Notes" component={NotesScreen} />
         <Stack.Screen name="AddNote" component={AddNoteScreen} />
         <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
+        <Stack.Screen name="Trash" component={TrashScreen} />
+        <Stack.Screen name="Audit" component={AuditScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

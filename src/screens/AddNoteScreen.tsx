@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
 import { insertVault } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
@@ -19,12 +20,31 @@ import { Ionicons } from "@expo/vector-icons";
 
 type AddNoteScreenProps = StackScreenProps<RootStackParamList, "AddNote">;
 
-export default function AddNoteScreen({ navigation }: AddNoteScreenProps): React.JSX.Element {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+export default function AddNoteScreen({ navigation, route }: AddNoteScreenProps): React.JSX.Element {
+  const initialTitle = route.params?.initialTitle || "";
+  const initialContent = route.params?.initialContent || "";
+  const isFile = route.params?.isFile || false;
+
+  const [title, setTitle] = useState(initialTitle);
+  const [content, setContent] = useState(isFile ? "Loading file content..." : initialContent);
   const [category, setCategory] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const toast = useToast();
+
+  React.useEffect(() => {
+    if (isFile && initialContent) {
+      const loadFile = async () => {
+        try {
+          const text = await FileSystem.readAsStringAsync(initialContent);
+          setContent(text);
+        } catch (e) {
+          setContent("");
+          toast.show("Failed to read file.", "error");
+        }
+      };
+      void loadFile();
+    }
+  }, [isFile, initialContent]);
 
   const onSave = async () => {
     if (!title.trim()) {

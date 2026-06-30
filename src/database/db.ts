@@ -15,6 +15,7 @@ export type VaultRow = {
   totp_secret: string | null;
   favourite: number; // 0 | 1
   is_note: number; // 0 | 1
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -55,6 +56,7 @@ export async function initializeDatabase(): Promise<void> {
         totp_secret TEXT,
         favourite INTEGER NOT NULL DEFAULT 0,
         is_note INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
@@ -68,6 +70,9 @@ export async function initializeDatabase(): Promise<void> {
   } catch {}
   try {
     await db.runAsync(`ALTER TABLE vaults ADD COLUMN is_note INTEGER NOT NULL DEFAULT 0;`, []);
+  } catch {}
+  try {
+    await db.runAsync(`ALTER TABLE vaults ADD COLUMN deleted_at TEXT;`, []);
   } catch {}
 
   await db.runAsync(
@@ -130,10 +135,11 @@ export async function getVaults(): Promise<VaultRow[]> {
         totp_secret,
         favourite,
         is_note,
+        deleted_at,
         created_at,
         updated_at
       FROM vaults
-      WHERE is_note = 0
+      WHERE is_note = 0 AND deleted_at IS NULL
       ORDER BY updated_at DESC;
     `,
     [],
@@ -157,10 +163,11 @@ export async function getNotes(): Promise<VaultRow[]> {
         totp_secret,
         favourite,
         is_note,
+        deleted_at,
         created_at,
         updated_at
       FROM vaults
-      WHERE is_note = 1
+      WHERE is_note = 1 AND deleted_at IS NULL
       ORDER BY updated_at DESC;
     `,
     [],
@@ -184,10 +191,11 @@ export async function getFavourites(): Promise<VaultRow[]> {
         totp_secret,
         favourite,
         is_note,
+        deleted_at,
         created_at,
         updated_at
       FROM vaults
-      WHERE favourite = 1
+      WHERE favourite = 1 AND deleted_at IS NULL
       ORDER BY site_name ASC;
     `,
     [],
@@ -268,10 +276,11 @@ export async function getVaultById(id: number): Promise<VaultRow | null> {
         totp_secret,
         favourite,
         is_note,
+        deleted_at,
         created_at,
         updated_at
       FROM vaults
-      WHERE id = ?
+      WHERE id = ? AND deleted_at IS NULL
       LIMIT 1;
     `,
     [id],
@@ -346,10 +355,62 @@ export async function deleteVault(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     `
+      UPDATE vaults
+      SET deleted_at = ?
+      WHERE id = ?;
+    `,
+    [new Date().toISOString(), id],
+  );
+}
+
+export async function restoreVault(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `
+      UPDATE vaults
+      SET deleted_at = NULL
+      WHERE id = ?;
+    `,
+    [id],
+  );
+}
+
+export async function hardDeleteVault(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `
       DELETE FROM vaults
       WHERE id = ?;
     `,
     [id],
+  );
+}
+
+export async function getDeletedItems(): Promise<VaultRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<VaultRow>(
+    `
+      SELECT
+        id,
+        site_name,
+        url,
+        username,
+        encrypted_password,
+        category,
+        notes,
+        tags,
+        strength_score,
+        totp_secret,
+        favourite,
+        is_note,
+        deleted_at,
+        created_at,
+        updated_at
+      FROM vaults
+      WHERE deleted_at IS NOT NULL
+      ORDER BY deleted_at DESC;
+    `,
+    [],
   );
 }
 
