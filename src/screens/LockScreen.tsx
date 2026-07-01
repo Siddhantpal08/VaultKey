@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useFocusEffect } from "@react-navigation/native";
 import { StackScreenProps } from "@react-navigation/stack";
@@ -45,6 +45,9 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   const [storedPINHash, setStoredPINHash] = useState<string | null>(null);
   const [hasPIN, setHasPIN] = useState<boolean>(false);
   const [requireMasterOnUnlock, setRequireMasterOnUnlock] = useState<boolean>(false);
+
+  // Tracks whether the automatic biometric prompt has already fired this mount
+  const hasTriggeredBiometric = useRef<boolean>(false);
 
   // Pulse animation for the icon ring
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -102,6 +105,22 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   useEffect(() => {
     void checkBiometricSupport();
   }, [checkBiometricSupport]);
+
+  // Auto-trigger biometrics once availability is confirmed and only once per mount
+  useEffect(() => {
+    if (
+      isBiometricAvailable &&
+      !hasTriggeredBiometric.current &&
+      !isAuthenticating &&
+      attemptsLeft > 0 &&
+      !lockedUntil
+    ) {
+      hasTriggeredBiometric.current = true;
+      void handleBiometricUnlock();
+    }
+  // We only want this to fire once when biometric availability becomes true
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBiometricAvailable]);
 
   useFocusEffect(
     React.useCallback(() => {
