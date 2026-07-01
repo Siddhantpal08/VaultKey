@@ -49,6 +49,15 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
 
   // Tracks whether the automatic biometric prompt has already fired this mount
   const hasTriggeredBiometric = useRef<boolean>(false);
+  // Tracks whether this screen is still mounted (prevents setState after unmount)
+  const isMounted = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Pulse animation for the icon ring
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -107,24 +116,30 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
     void checkBiometricSupport();
   }, [checkBiometricSupport]);
 
-  // Auto-trigger biometrics once availability is confirmed and only once per mount
+  // Auto-trigger biometrics once availability is confirmed (fires exactly once per mount)
   useEffect(() => {
     if (
-      isBiometricAvailable &&
-      !hasTriggeredBiometric.current &&
-      !isAuthenticating &&
-      attemptsLeft > 0 &&
-      !lockedUntil
+      !isBiometricAvailable ||
+      hasTriggeredBiometric.current ||
+      isAuthenticating ||
+      attemptsLeft <= 0 ||
+      lockedUntil
     ) {
-      hasTriggeredBiometric.current = true;
-      // Delay slightly to ensure screen is fully mounted and Activity is in foreground
-      setTimeout(() => {
-        if (AppState.currentState === "active") {
-          void handleBiometricUnlock();
-        }
-      }, 400);
+      return;
     }
-  // We only want this to fire once when biometric availability becomes true
+
+    hasTriggeredBiometric.current = true;
+
+    // Wait for the Android Activity to be fully in the foreground before presenting
+    // the system biometric overlay. Firing too early (< ~600ms after mount on a fresh
+    // install) causes a fatal "Activity not in foreground" exception on Android.
+    const timer = setTimeout(() => {
+      if (isMounted.current && AppState.currentState === "active") {
+        void handleBiometricUnlock();
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBiometricAvailable]);
 
@@ -186,18 +201,20 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   };
 
   const handleBiometricUnlock = async (): Promise<void> => {
-    if (attemptsLeft <= 0 || isAuthenticating) {
+    if (!isMounted.current || attemptsLeft <= 0 || isAuthenticating) {
       return;
     }
 
     try {
-      setIsAuthenticating(true);
+      if (isMounted.current) setIsAuthenticating(true);
 
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Unlock VaultKey",
         cancelLabel: "Cancel",
         fallbackLabel: "Use PIN",
       });
+
+      if (!isMounted.current) return;
 
       if (result.success) {
         void onAuthSuccess();
@@ -209,10 +226,10 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
         consumeAttempt();
       }
     } catch (err) {
-      console.warn("Biometric auth error:", err);
-      // Ignore exception so the app doesn't crash; the user can still use PIN/Master.
+      // Gracefully ignore — user can still use PIN or Master Password
+      console.warn("Biometric auth exception:", err);
     } finally {
-      setIsAuthenticating(false);
+      if (isMounted.current) setIsAuthenticating(false);
     }
   };
 

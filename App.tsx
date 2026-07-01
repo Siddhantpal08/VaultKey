@@ -2,7 +2,7 @@ import "react-native-gesture-handler";
 import "react-native-get-random-values";
 import React from "react";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, StyleSheet, View, AppState, type AppStateStatus } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View, AppState, type AppStateStatus } from "react-native";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { initializeDatabase } from "./src/database/db";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -28,20 +28,27 @@ export default function App(): React.JSX.Element {
 
     void bootstrap();
 
-    // Enable native screen capture protection and App Switcher blur on iOS
+    // Enable screen capture protection.
+    // FLAG_SECURE on Android already hides the app in the recents switcher.
+    // enableAppSwitcherProtectionAsync is iOS-only — calling it on Android crashes the app.
     const enableProtection = async () => {
       try {
         await ScreenCapture.preventScreenCaptureAsync();
-        await ScreenCapture.enableAppSwitcherProtectionAsync(0.85);
+        if (Platform.OS === "ios") {
+          await ScreenCapture.enableAppSwitcherProtectionAsync(0.85);
+        }
       } catch (err) {
         console.warn("Failed to enable screen protection:", err);
       }
     };
     void enableProtection();
 
-    // Listen to AppState transitions to toggle JS-level blur overlay
+    // Listen to AppState transitions to toggle JS-level blur overlay (Android only,
+    // iOS gets native protection above).
     const handleAppStateChange = (nextState: AppStateStatus): void => {
-      setIsBackground(nextState === "inactive" || nextState === "background");
+      if (Platform.OS === "android") {
+        setIsBackground(nextState === "inactive" || nextState === "background");
+      }
     };
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
