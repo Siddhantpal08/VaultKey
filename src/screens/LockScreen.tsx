@@ -5,6 +5,7 @@ import { StackScreenProps } from "@react-navigation/stack";
 import {
   Alert,
   Animated,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -116,7 +117,12 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
       !lockedUntil
     ) {
       hasTriggeredBiometric.current = true;
-      void handleBiometricUnlock();
+      // Delay slightly to ensure screen is fully mounted and Activity is in foreground
+      setTimeout(() => {
+        if (AppState.currentState === "active") {
+          void handleBiometricUnlock();
+        }
+      }, 400);
     }
   // We only want this to fire once when biometric availability becomes true
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,6 +208,9 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
       if (authError !== "user_cancel" && authError !== "system_cancel") {
         consumeAttempt();
       }
+    } catch (err) {
+      console.warn("Biometric auth error:", err);
+      // Ignore exception so the app doesn't crash; the user can still use PIN/Master.
     } finally {
       setIsAuthenticating(false);
     }
