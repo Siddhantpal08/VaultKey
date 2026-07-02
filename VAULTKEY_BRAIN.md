@@ -56,6 +56,16 @@ This file serves as the context repository for the AI assistant to understand th
 - `created_at` (TEXT)
 - `updated_at` (TEXT)
 
+## 🏗 Build Environment (CRITICAL)
+- **Java Version:** AGP requires Java 17+. System has Java 11 installed.
+  - **Fix:** `gradle.properties` has `org.gradle.java.home=D:\\Android Studio\\jbr` (OpenJDK 21 from Android Studio).
+  - This is the **key fix** — without it, the build fails with "AGP requires Java 17".
+- **local.properties:** NOT in Git (gitignored). Must be recreated after `expo prebuild --clean`.
+  - Content: `sdk.dir=C\:\\Users\\Siddhant Pal\\AppData\\Local\\Android\\Sdk`
+- **Assets:** `icon.png`, `splash-icon.png`, `adaptive-icon.png` must be real PNGs (not JPEGs). Use `sharp` to convert if needed.
+- **Gradle Cache Issues:** If corrupted metadata.bin errors occur, stop daemons (`gradlew --stop`) and delete `%USERPROFILE%\.gradle\caches\8.14.3`.
+- **Prebuild Command:** `npx expo prebuild --platform android --clean` (wipes and regenerates `/android`)
+
 ## 🔧 Workflow Rules
 - Always use `SafeAreaView` from `react-native-safe-area-context`.
 - Handle state properly to prevent memory leaks with session keys.

@@ -57,7 +57,8 @@
     "plugins": [
       "expo-sqlite",
       "expo-secure-store",
-      "expo-share-intent"
+      "expo-share-intent",
+      "expo-font"
     ],
     "extra": {
       "eas": {
