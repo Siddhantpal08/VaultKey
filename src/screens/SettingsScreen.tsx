@@ -22,6 +22,7 @@ import {
   getPINHash,
   getSetting,
   getVaults,
+  getNotes,
   insertVault,
   setPINHash,
   updateVault,
@@ -206,10 +207,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
 
   const exportData = async (): Promise<void> => {
     try {
-      const vaults = await getVaults();
+      const vaultsData = await getVaults();
+      const notesData = await getNotes();
+      const allEntries = [...vaultsData, ...notesData];
       const settings = await getAllSettings();
       const payload = JSON.stringify(
-        { schema: "vaultkey-export-v1", exportedAt: new Date().toISOString(), vaults, settings },
+        { schema: "vaultkey-export-v1", exportedAt: new Date().toISOString(), vaults: allEntries, settings },
         null, 2,
       );
       const target = `${documentDirectory ?? ""}vaultkey-export-${Date.now()}.json`;
@@ -222,12 +225,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
 
   const exportEncrypted = async (): Promise<void> => {
     try {
-      const vaults = await getVaults();
+      const vaultsData = await getVaults();
+      const notesData = await getNotes();
+      const allEntries = [...vaultsData, ...notesData];
       const settings = await getAllSettings();
       const payload = JSON.stringify({
         schema: "vaultkey-export-v1",
         exportedAt: new Date().toISOString(),
-        vaults,
+        vaults: allEntries,
         settings,
       });
       if (!hasSessionKey()) {
@@ -266,6 +271,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
           site_name: string; url: string | null; username: string;
           encrypted_password: string; category: string | null; notes: string | null;
           tags: string | null; strength_score: number | null; totp_secret: string | null;
+          is_note?: number;
         }>;
       };
 
@@ -309,7 +315,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
               siteName: row.site_name, url: row.url, username: row.username,
               encryptedPassword: row.encrypted_password, category: row.category,
               notes: row.notes, tags: row.tags, strengthScore: row.strength_score,
-              totpSecret: row.totp_secret,
+              totpSecret: row.totp_secret, isNote: row.is_note ?? 0,
             });
             inserted += 1;
             if (mode === "merge") {

@@ -50,6 +50,7 @@ export default function PasswordDetailScreen({
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
   const [isFavourite, setIsFavourite] = React.useState<boolean>(false);
   const [totp, setTotp] = React.useState<TOTPResult | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = React.useState<boolean>(false);
   const toast = useToast();
 
   const [entry, setEntry] = React.useState<{
@@ -155,23 +156,18 @@ export default function PasswordDetailScreen({
     }
   };
 
+  const confirmDelete = async (): Promise<void> => {
+    try {
+      await deleteVault(route.params.id);
+      toast.show("Entry deleted", "info");
+      navigation.replace("Home");
+    } catch {
+      toast.show("Delete failed. Please try again.", "error");
+    }
+  };
+
   const onDelete = (): void => {
-    Alert.alert("Delete Password", "This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteVault(route.params.id);
-            toast.show("Entry deleted", "info");
-            navigation.replace("Home");
-          } catch {
-            toast.show("Delete failed. Please try again.", "error");
-          }
-        },
-      },
-    ]);
+    setShowDeleteModal(true);
   };
 
   const handleToggleFavourite = async (): Promise<void> => {
@@ -370,9 +366,32 @@ export default function PasswordDetailScreen({
         ) : null}
 
         <Pressable style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteButtonText}><Ionicons name="trash" size={14} /> Delete Entry</Text>
+          <Text style={styles.deleteButtonText}><Ionicons name="trash" size={14} /> Move to Trash</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Themed Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning" size={32} color={Colors.error} />
+            </View>
+            <Text style={styles.modalTitle}>Delete Password</Text>
+            <Text style={styles.modalText}>
+              This will move the password to the Trash. You can recover it or permanently delete it later.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancel} onPress={() => setShowDeleteModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalDelete} onPress={() => void confirmDelete()}>
+                <Text style={styles.modalDeleteText}>Move to Trash</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -547,5 +566,50 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingVertical: 13,
     alignItems: "center",
   },
-  deleteButtonText: { color: "#FCA5A5", fontSize: 14, fontWeight: "700" },
+  deleteButtonText: { color: Colors.error, fontSize: 15, fontWeight: "700" },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 24,
+    zIndex: 100,
+  },
+  modal: {
+    backgroundColor: Colors.bg,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.errorBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { color: Colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  modalText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 12, width: "100%" },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgInput,
+  },
+  modalCancelText: { color: Colors.textSecondary, fontWeight: "700" },
+  modalDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: Colors.error,
+  },
+  modalDeleteText: { color: "#FFFFFF", fontWeight: "700" },
 });

@@ -193,7 +193,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 100,
   },
   modal: {
-    backgroundColor: Colors.bgCard,
+    backgroundColor: Colors.bg,
     borderRadius: 20,
     padding: 24,
     borderWidth: 1,

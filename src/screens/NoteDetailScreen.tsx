@@ -16,16 +16,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { deleteVault, getVaultById, updateVault } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { decryptWithSession, encryptWithSession, hasSessionKey } from "../security/crypto";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
 
 type NoteDetailScreenProps = StackScreenProps<RootStackParamList, "NoteDetail">;
 
 export default function NoteDetailScreen({ route, navigation }: NoteDetailScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
   const [isEditing, setIsEditing] = React.useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = React.useState<boolean>(false);
 
   // Note data
   const [title, setTitle] = useState("");
@@ -98,23 +102,18 @@ export default function NoteDetailScreen({ route, navigation }: NoteDetailScreen
     }
   };
 
+  const confirmDelete = async () => {
+    try {
+      await deleteVault(route.params.id);
+      toast.show("Note deleted", "success");
+      navigation.goBack();
+    } catch {
+      toast.show("Failed to delete note", "error");
+    }
+  };
+
   const onDelete = () => {
-    Alert.alert(
-      "Delete Note",
-      "Are you sure you want to permanently delete this secure note?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await deleteVault(route.params.id);
-            toast.show("Note deleted", "success");
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    setShowDeleteModal(true);
   };
 
   const copyContent = async () => {
@@ -226,14 +225,37 @@ export default function NoteDetailScreen({ route, navigation }: NoteDetailScreen
         ) : null}
 
         <Pressable style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteButtonText}><Ionicons name="trash" size={14} /> Delete Note</Text>
+          <Text style={styles.deleteButtonText}><Ionicons name="trash" size={14} /> Move to Trash</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Themed Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning" size={32} color={Colors.error} />
+            </View>
+            <Text style={styles.modalTitle}>Delete Note</Text>
+            <Text style={styles.modalText}>
+              This will move the secure note to the Trash. You can recover it or permanently delete it later.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancel} onPress={() => setShowDeleteModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalDelete} onPress={() => void confirmDelete()}>
+                <Text style={styles.modalDeleteText}>Move to Trash</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingBottom: 28, paddingTop: 6 },
   loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -322,5 +344,50 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.errorBg,
     marginTop: 20,
   },
-  deleteButtonText: { color: "#FCA5A5", fontWeight: "700", fontSize: 14 },
+  deleteButtonText: { color: Colors.error, fontWeight: "700", fontSize: 15 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 24,
+    zIndex: 100,
+  },
+  modal: {
+    backgroundColor: Colors.bg,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.errorBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { color: Colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  modalText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 12, width: "100%" },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgInput,
+  },
+  modalCancelText: { color: Colors.textSecondary, fontWeight: "700" },
+  modalDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: Colors.error,
+  },
+  modalDeleteText: { color: "#FFFFFF", fontWeight: "700" },
 });
