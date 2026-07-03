@@ -10,6 +10,12 @@ import { ToastProvider } from "./src/components/Toast";
 import { BlurView } from "expo-blur";
 import * as ScreenCapture from "expo-screen-capture";
 import { VKLogo } from "./src/components/VKLogo";
+import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
+
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? "light" : "dark"} />;
+}
 
 export default function App(): React.JSX.Element {
   const [isReady, setIsReady] = React.useState(false);
@@ -69,9 +75,10 @@ export default function App(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaProvider>
-      <ToastProvider>
-        <StatusBar style="light" />
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <ToastProvider>
+          <ThemedStatusBar />
         <AppNavigator />
         {isBackground && (
           <View style={styles.overlay}>
@@ -81,6 +88,7 @@ export default function App(): React.JSX.Element {
         )}
       </ToastProvider>
     </SafeAreaProvider>
+  </ThemeProvider>
   );
 }
 

@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
@@ -73,6 +74,8 @@ function estimateCrackTime(password: string): string {
 }
 
 export default function GeneratorScreen({ navigation }: GeneratorScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [length, setLength] = React.useState<number>(16);
   const [lowercase, setLowercase] = React.useState<boolean>(true);
   const [uppercase, setUppercase] = React.useState<boolean>(true);
@@ -112,8 +115,19 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}><Ionicons name="flash" size={24} /> Generator</Text>
-        <Text style={styles.subtitle}>Create cryptographically strong passwords instantly.</Text>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}><Ionicons name="flash" size={24} /> Generator</Text>
+            <Text style={styles.subtitle}>Create cryptographically strong passwords instantly.</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+            onPress={() => navigation.navigate("Settings")}
+            hitSlop={8}
+          >
+            <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+          </Pressable>
+        </View>
 
         {/* Output card */}
         <View style={styles.outputCard}>
@@ -185,9 +199,8 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
         onTabPress={(tab) => {
           if (tab === "Vault") navigation.navigate("Home");
           else if (tab === "Notes") navigation.navigate("Notes");
-          else if (tab === "Settings") navigation.navigate("Settings");
+          else if (tab === "Auth") navigation.navigate("Authenticator");
         }}
-        onAddPress={() => navigation.navigate("AddPassword")}
       />
     </SafeAreaView>
   );
@@ -206,6 +219,8 @@ function ToggleRow({
   onPress: () => void;
   last?: boolean;
 }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <Pressable
       style={[styles.toggleRow, !last && styles.toggleRowBorder]}
@@ -222,11 +237,28 @@ function ToggleRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  reloadBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(91,141,239,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(91,141,239,0.25)",
+  },
+  reloadBtnPressed: { backgroundColor: "rgba(91,141,239,0.25)" },
   title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700", marginBottom: 4 },
-  subtitle: { color: Colors.textSecondary, fontSize: 13, marginBottom: 14 },
+  subtitle: { color: Colors.textSecondary, fontSize: 13 },
   outputCard: {
     borderRadius: 16,
     borderWidth: 1,

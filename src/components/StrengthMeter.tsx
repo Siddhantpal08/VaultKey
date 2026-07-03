@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 
 type StrengthMeterProps = {
   score: number; // 0–5
@@ -10,6 +11,8 @@ type StrengthMeterProps = {
 const LABELS = ["None", "Weak", "Fair", "Good", "Strong", "Very Strong"];
 
 export function StrengthMeter({ score, showLabel = true }: StrengthMeterProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <View>
       <View style={styles.bars}>
@@ -47,7 +50,7 @@ export function StrengthMeter({ score, showLabel = true }: StrengthMeterProps): 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   bars: {
     flexDirection: "row",
     gap: 5,

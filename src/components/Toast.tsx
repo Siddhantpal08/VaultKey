@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 
 type ToastType = "success" | "error" | "info";
 
@@ -22,6 +23,8 @@ const ToastContext = createContext<ToastContextValue>({ show: () => {} });
 let _counter = 0;
 
 export function ToastProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const timeouts = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -85,7 +88,7 @@ export function useToast(): ToastContextValue {
   return useContext(ToastContext);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     position: "absolute",
     bottom: 100,

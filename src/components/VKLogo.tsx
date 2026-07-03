@@ -1,9 +1,12 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 
 /** Inline VK logo using pure RN primitives — no external image needed. */
 export function VKLogo(): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const logo = useStyles(createLogoStyles);
   return (
     <View style={logo.outer}>
       <View style={logo.ring} />
@@ -16,7 +19,7 @@ export function VKLogo(): React.JSX.Element {
   );
 }
 
-const logo = StyleSheet.create({
+const createLogoStyles = (Colors: ThemeColors) => StyleSheet.create({
   outer: {
     width: 100,
     height: 100,

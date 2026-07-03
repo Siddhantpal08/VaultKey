@@ -13,13 +13,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getNotes, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { Ionicons } from "@expo/vector-icons";
 
 type NotesScreenProps = StackScreenProps<RootStackParamList, "Notes">;
 
 export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [notes, setNotes] = React.useState<VaultRow[]>([]);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
@@ -55,7 +58,16 @@ export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX
             <Text style={styles.title}>Secure Notes</Text>
             <Text style={styles.subtitle}>{notes.length} notes safely stored</Text>
           </View>
-          <Ionicons name="document-text" size={32} color={Colors.accent} />
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <Ionicons name="document-text" size={32} color={Colors.accent} />
+            <Pressable
+              style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+              onPress={() => navigation.navigate("Settings")}
+              hitSlop={8}
+            >
+              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+            </Pressable>
+          </View>
         </View>
 
         <TextInput
@@ -117,15 +129,22 @@ export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX
         onTabPress={(tab) => {
           if (tab === "Vault") navigation.navigate("Home");
           else if (tab === "Generator") navigation.navigate("Generator");
-          else if (tab === "Settings") navigation.navigate("Settings");
+          else if (tab === "Auth") navigation.navigate("Authenticator");
         }}
-        onAddPress={() => navigation.navigate("AddNote")}
       />
+
+      {/* Page-specific FAB */}
+      <Pressable 
+        style={styles.pageFab}
+        onPress={() => navigation.navigate("AddNote")}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </Pressable>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   header: {
@@ -134,6 +153,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  reloadBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(91,141,239,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(91,141,239,0.25)",
+  },
+  reloadBtnPressed: { backgroundColor: "rgba(91,141,239,0.25)" },
   title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700" },
   subtitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
   searchInput: {
@@ -183,5 +213,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     overflow: "hidden",
+  },
+  pageFab: {
+    position: "absolute",
+    bottom: 90,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    elevation: 14,
+    zIndex: 10,
   },
 });

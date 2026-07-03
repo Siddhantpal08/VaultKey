@@ -1,9 +1,10 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 
-export type TabName = "Vault" | "Notes" | "Generator" | "Settings";
+export type TabName = "Vault" | "Notes" | "Generator" | "Auth";
 
 type Tab = {
   name: TabName;
@@ -15,23 +16,19 @@ const TABS: Tab[] = [
   { name: "Vault", icon: "shield-checkmark", label: "Vault" },
   { name: "Notes", icon: "document-text", label: "Notes" },
   { name: "Generator", icon: "flash", label: "Generate" },
-  { name: "Settings", icon: "settings", label: "Settings" },
+  { name: "Auth", icon: "timer-outline", label: "Auth" },
 ];
 
 type BottomTabBarProps = {
   activeTab: TabName;
   onTabPress: (tab: TabName) => void;
-  onAddPress: () => void;
 };
 
-export function BottomTabBar({ activeTab, onTabPress, onAddPress }: BottomTabBarProps): React.JSX.Element {
+export function BottomTabBar({ activeTab, onTabPress }: BottomTabBarProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <View style={styles.wrapper}>
-      {/* Floating Add button — sits above the tab bar */}
-      <Pressable style={styles.fab} onPress={onAddPress}>
-        <Ionicons name="add" size={28} color="#FFFFFF" style={styles.fabIcon} />
-      </Pressable>
-
       <View style={styles.bar}>
         {TABS.slice(0, 2).map((tab) => {
           const isActive = tab.name === activeTab;
@@ -55,7 +52,6 @@ export function BottomTabBar({ activeTab, onTabPress, onAddPress }: BottomTabBar
             </Pressable>
           );
         })}
-        <View style={{ flex: 1 }} />
         {TABS.slice(2, 4).map((tab) => {
           const isActive = tab.name === activeTab;
           return (
@@ -83,7 +79,7 @@ export function BottomTabBar({ activeTab, onTabPress, onAddPress }: BottomTabBar
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   wrapper: {
     position: "relative",
     paddingBottom: 0,
@@ -125,25 +121,5 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: Colors.tabActive,
-  },
-  fab: {
-    position: "absolute",
-    top: -24,
-    alignSelf: "center",
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.55,
-    shadowRadius: 12,
-    elevation: 14,
-    zIndex: 10,
-  },
-  fabIcon: {
-    lineHeight: 28,
   },
 });

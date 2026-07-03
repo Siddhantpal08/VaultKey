@@ -12,15 +12,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getDeletedItems, restoreVault, hardDeleteVault, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 
 type TrashScreenProps = StackScreenProps<RootStackParamList, "Trash">;
 
 export default function TrashScreen({ navigation }: TrashScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [items, setItems] = React.useState<VaultRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -41,21 +45,15 @@ export default function TrashScreen({ navigation }: TrashScreenProps): React.JSX
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert(
-      "Permanent Delete",
-      "Are you sure you want to permanently delete this item? It cannot be recovered.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await hardDeleteVault(id);
-            void loadData();
-          },
-        },
-      ]
-    );
+    setDeleteTarget(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteTarget !== null) {
+      await hardDeleteVault(deleteTarget);
+      setDeleteTarget(null);
+      void loadData();
+    }
   };
 
   return (
@@ -112,11 +110,34 @@ export default function TrashScreen({ navigation }: TrashScreenProps): React.JSX
           />
         )}
       </View>
+
+      {/* Themed Delete Confirmation Modal */}
+      {deleteTarget !== null && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning" size={32} color={Colors.error} />
+            </View>
+            <Text style={styles.modalTitle}>Permanent Delete</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to permanently delete this item? It cannot be recovered.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancel} onPress={() => setDeleteTarget(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalDelete} onPress={() => void confirmDelete()}>
+                <Text style={styles.modalDeleteText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   header: {
@@ -157,5 +178,56 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   actions: { flexDirection: "row", gap: 12 },
-  actionBtn: { padding: 6 },
+  actionBtn: { 
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.bgInput,
+    borderWidth: 1,
+    borderColor: Colors.borderInput,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 24,
+    zIndex: 100,
+  },
+  modal: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.errorBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { color: Colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  modalText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 12, width: "100%" },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgInput,
+  },
+  modalCancelText: { color: Colors.textSecondary, fontWeight: "700" },
+  modalDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: Colors.error,
+  },
+  modalDeleteText: { color: "#FFFFFF", fontWeight: "700" },
 });

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "vaultkey",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
@@ -18,7 +18,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.siddhantpal.VaultKey"
+      "bundleIdentifier": "com.siddhantpal.VaultKey",
+      "infoPlist": {
+        "NSCameraUsageDescription": "VaultKey needs access to your camera to scan QR codes for 2FA."
+      }
     },
     "android": {
       "versionCode": 4,
@@ -32,6 +35,7 @@
       "intentFilters": [
         {
           "action": "VIEW",
+          "autoVerify": false,
           "data": [
             {
               "scheme": "file",
@@ -49,6 +53,9 @@
             "BROWSABLE"
           ]
         }
+      ],
+      "permissions": [
+        "CAMERA"
       ]
     },
     "web": {
@@ -58,7 +65,14 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-share-intent",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "VaultKey needs access to your camera to scan QR codes for 2FA."
+        }
+      ],
+      "./withAppLabel.js"
     ],
     "extra": {
       "eas": {

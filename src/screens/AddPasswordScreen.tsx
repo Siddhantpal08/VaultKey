@@ -15,7 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, insertVault, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { StrengthMeter } from "../components/StrengthMeter";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,19 +56,26 @@ function generateStrongPassword(length = 16): string {
   return value;
 }
 
-export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps): React.JSX.Element {
+export default function AddPasswordScreen({ navigation, route }: AddPasswordScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const prefillUrl = route.params?.prefillUrl ?? "";
+  const prefillSiteName = route.params?.prefillSiteName ?? "";
+  const prefillTotpSecret = route.params?.prefillTotpSecret ?? "";
+
   const [form, setForm] = React.useState<FormState>({
-    siteName: "",
-    url: "",
+    siteName: prefillSiteName,
+    url: prefillUrl,
     username: "",
     password: "",
     category: "General",
     tags: "",
     notes: "",
-    totpSecret: "",
+    totpSecret: prefillTotpSecret,
   });
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
+  const [genLength, setGenLength] = React.useState<number>(16);
   const toast = useToast();
 
   const strength = React.useMemo(() => computeStrength(form.password), [form.password]);
@@ -144,6 +152,13 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
           Encrypted on-device with AES-256-GCM before being stored.
         </Text>
 
+        {prefillUrl ? (
+          <View style={styles.sharedBanner}>
+            <Ionicons name="link" size={13} color={Colors.accent} />
+            <Text style={styles.sharedBannerText}>Pre-filled from shared URL</Text>
+          </View>
+        ) : null}
+
         <Field label="Site Name *">
           <TextInput
             value={form.siteName}
@@ -197,13 +212,25 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
             </Pressable>
             <Pressable
               style={styles.linkBtn}
-              onPress={() => updateField("password", generateStrongPassword(16))}
+              onPress={() => updateField("password", generateStrongPassword(genLength))}
             >
               <View style={styles.linkBtnInner}>
                 <Ionicons name="flash" size={18} color={Colors.accent} />
                 <Text style={styles.linkBtnText}>Generate strong</Text>
               </View>
             </Pressable>
+          </View>
+          <View style={styles.lenRow}>
+            <Text style={styles.lenLabel}>Length:</Text>
+            {[8, 12, 16, 24].map((len) => (
+              <Pressable 
+                key={len} 
+                style={[styles.lenChip, genLength === len && styles.lenChipActive]} 
+                onPress={() => setGenLength(len)}
+              >
+                <Text style={[styles.lenChipText, genLength === len && styles.lenChipTextActive]}>{len}</Text>
+              </Pressable>
+            ))}
           </View>
           <StrengthMeter score={strength} />
         </Field>
@@ -283,6 +310,8 @@ export default function AddPasswordScreen({ navigation }: AddPasswordScreenProps
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -291,7 +320,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingBottom: 28, paddingTop: 6 },
   topBar: { marginBottom: 8 },
@@ -299,6 +328,19 @@ const styles = StyleSheet.create({
   backText: { color: Colors.accent, fontWeight: "700", fontSize: 14 },
   title: { color: Colors.textPrimary, fontSize: 26, fontWeight: "700", marginBottom: 4 },
   subtitle: { color: Colors.textSecondary, fontSize: 12, marginBottom: 18, lineHeight: 18 },
+  sharedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.accentBg,
+    borderWidth: 1,
+    borderColor: Colors.accentBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  sharedBannerText: { color: Colors.textAccent, fontSize: 12, fontWeight: "600" },
   field: { marginBottom: 14 },
   fieldLabel: {
     color: Colors.textAccent,
@@ -324,6 +366,12 @@ const styles = StyleSheet.create({
   linkBtn: {},
   linkBtnInner: { flexDirection: "row", alignItems: "center", gap: 5 },
   linkBtnText: { color: Colors.accent, fontSize: 14, fontWeight: "700" },
+  lenRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  lenLabel: { color: Colors.textMuted, fontSize: 12, marginRight: 4 },
+  lenChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.borderInput },
+  lenChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  lenChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  lenChipTextActive: { color: Colors.textPrimary },
   catList: { gap: 8, paddingVertical: 4 },
   catChip: {
     borderRadius: 999,

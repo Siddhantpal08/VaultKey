@@ -16,7 +16,8 @@ import { deleteVault, getSetting, getVaultById, toggleFavourite, updateVault } f
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { decryptWithSession, encryptWithSession, hasSessionKey } from "../security/crypto";
 import { generateTOTP, type TOTPResult } from "../security/totp";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { StrengthMeter } from "../components/StrengthMeter";
 import { SiteIcon } from "../components/SiteIcon";
 import { useToast } from "../components/Toast";
@@ -41,6 +42,8 @@ export default function PasswordDetailScreen({
   route,
   navigation,
 }: PasswordDetailScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isEditing, setIsEditing] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
@@ -375,6 +378,8 @@ export default function PasswordDetailScreen({
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -400,6 +405,8 @@ function EditableText({
   mono?: boolean;
   placeholder?: string;
 }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   return (
     <TextInput
       value={value}
@@ -420,7 +427,7 @@ function EditableText({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },

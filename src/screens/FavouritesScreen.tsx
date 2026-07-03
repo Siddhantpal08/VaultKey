@@ -13,7 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getFavourites, toggleFavourite, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { SiteIcon } from "../components/SiteIcon";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,8 @@ import { Ionicons } from "@expo/vector-icons";
 type FavouritesScreenProps = StackScreenProps<RootStackParamList, "Favourites">;
 
 export default function FavouritesScreen({ navigation }: FavouritesScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [vaults, setVaults] = React.useState<VaultRow[]>([]);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
@@ -64,7 +67,16 @@ export default function FavouritesScreen({ navigation }: FavouritesScreenProps):
             <Text style={styles.title}>Starred</Text>
             <Text style={styles.subtitle}>{vaults.length} favourites</Text>
           </View>
-          <Ionicons name="star" size={28} color={Colors.star} />
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <Ionicons name="star" size={28} color={Colors.star} />
+            <Pressable
+              style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+              onPress={() => navigation.navigate("Settings")}
+              hitSlop={8}
+            >
+              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+            </Pressable>
+          </View>
         </View>
 
         <TextInput
@@ -126,7 +138,7 @@ export default function FavouritesScreen({ navigation }: FavouritesScreenProps):
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   header: {
@@ -135,6 +147,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  reloadBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(91,141,239,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(91,141,239,0.25)",
+  },
+  reloadBtnPressed: { backgroundColor: "rgba(91,141,239,0.25)" },
   title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700" },
   subtitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
   searchInput: {

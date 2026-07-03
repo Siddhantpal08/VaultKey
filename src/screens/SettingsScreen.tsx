@@ -1,5 +1,6 @@
 import React from "react";
 import * as DocumentPicker from "expo-document-picker";
+import { shareAsync } from "expo-sharing";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore expo-file-system legacy typed exports
 import { documentDirectory, writeAsStringAsync, readAsStringAsync } from "expo-file-system/legacy";
@@ -39,7 +40,8 @@ import {
 // @ts-ignore noble hashes resolution
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Buffer } from "buffer";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme, type ThemePreference } from "../theme/ThemeContext";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
@@ -75,6 +77,16 @@ function hashPIN(pin: string): string {
   return Buffer.from(hash).toString("base64");
 }
 
+function computeStrength(p: string): number {
+  let s = 0;
+  if (p.length >= 8) s++;
+  if (p.length >= 12) s++;
+  if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
+  if (/\d/.test(p)) s++;
+  if (/[^A-Za-z0-9]/.test(p)) s++;
+  return Math.min(5, s);
+}
+
 function boolToString(value: boolean): string {
   return value ? "true" : "false";
 }
@@ -84,6 +96,9 @@ function toMergeKey(siteName: string, username: string): string {
 }
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps): React.JSX.Element {
+  const { colors: Colors, preference, setPreference } = useTheme();
+  const styles = useStyles(createStyles);
+  const sStyles = useStyles(createSharedStyles);
   const [state, setState] = React.useState<SettingsState>({
     biometricsEnabled: true,
     autoLockOnBackground: true,
@@ -199,24 +214,51 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
       );
       const target = `${documentDirectory ?? ""}vaultkey-export-${Date.now()}.json`;
       await writeAsStringAsync(target, payload);
-      Alert.alert(
-        "Export complete",
-        `The export includes encrypted passwords — they can only be decrypted with your master password.\n\nSaved to:\n${target}`,
-      );
+      await shareAsync(target);
     } catch {
       toast.show("Export failed.", "error");
+    }
+  };
+
+  const exportEncrypted = async (): Promise<void> => {
+    try {
+      const vaults = await getVaults();
+      const settings = await getAllSettings();
+      const payload = JSON.stringify({
+        schema: "vaultkey-export-v1",
+        exportedAt: new Date().toISOString(),
+        vaults,
+        settings,
+      });
+      if (!hasSessionKey()) {
+        toast.show("Vault is locked. Session missing.", "error");
+        return;
+      }
+      const encrypted = encryptWithSession(payload);
+      const target = `${documentDirectory ?? ""}vaultkey-backup-${Date.now()}.pnb`;
+      await writeAsStringAsync(target, encrypted);
+      await shareAsync(target, { dialogTitle: "Save VaultKey Backup" });
+    } catch {
+      toast.show("Encrypted export failed.", "error");
     }
   };
 
   const importData = async (mode: "merge" | "replace"): Promise<void> => {
     try {
       const selected = await DocumentPicker.getDocumentAsync({
-        type: "application/json",
+        type: "*/*",
         copyToCacheDirectory: true,
       });
       if (selected.canceled || selected.assets.length === 0) return;
       const file = selected.assets[0];
       if (!file) return;
+
+      const fileName = file.name || "";
+      if (fileName.toLowerCase().endsWith(".pnb")) {
+        navigation.navigate("ImportPnb", { filePath: file.uri });
+        return;
+      }
+
       const raw = await readAsStringAsync(file.uri);
       const parsed = JSON.parse(raw) as {
         settings?: Array<{ key: string; value: string }>;
@@ -296,6 +338,83 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
     }
   };
 
+  const importCSV = async (): Promise<void> => {
+    try {
+      const selected = await DocumentPicker.getDocumentAsync({
+        type: ["text/comma-separated-values", "text/csv", ".csv"],
+        copyToCacheDirectory: true,
+      });
+      if (selected.canceled || selected.assets.length === 0) return;
+
+      const raw = await readAsStringAsync(selected.assets[0].uri);
+      const lines = raw.split("\n").filter(Boolean);
+      if (lines.length < 2) { 
+        toast.show("Empty CSV.", "error"); 
+        return; 
+      }
+
+      const headers = lines[0].toLowerCase().split(",").map(h => h.trim().replace(/"/g, ""));
+      let inserted = 0, skipped = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        let name = "", url = "", username = "", password = "";
+
+        if (headers.includes("login_username")) {
+          // Bitwarden
+          name = cols[headers.indexOf("name")] ?? "";
+          url = cols[headers.indexOf("login_uri")] ?? "";
+          username = cols[headers.indexOf("login_username")] ?? "";
+          password = cols[headers.indexOf("login_password")] ?? "";
+        } else if (headers.includes("httprealm") || headers.indexOf("url") === 0) {
+          // Firefox
+          url = cols[headers.indexOf("url")] ?? "";
+          username = cols[headers.indexOf("username")] ?? "";
+          password = cols[headers.indexOf("password")] ?? "";
+          try {
+            name = new URL(url).hostname.replace(/^www\./, "") || url;
+          } catch {
+            name = url;
+          }
+        } else {
+          // Chrome / generic
+          name = cols[headers.indexOf("name")] ?? "";
+          url = cols[headers.indexOf("url")] ?? "";
+          username = cols[headers.indexOf("username")] ?? "";
+          password = cols[headers.indexOf("password")] ?? "";
+        }
+
+        if (!username || !password) { 
+          skipped++; 
+          continue; 
+        }
+
+        if (!hasSessionKey()) {
+          toast.show("Vault is locked.", "error");
+          return;
+        }
+
+        const encrypted = encryptWithSession(password);
+        await insertVault({
+          siteName: name || url || "Imported",
+          url: url || null,
+          username,
+          encryptedPassword: encrypted,
+          category: "Import",
+          notes: null,
+          tags: null,
+          strengthScore: computeStrength(password),
+          totpSecret: null,
+        });
+        inserted++;
+      }
+
+      Alert.alert("CSV Import Done", `Imported: ${inserted}\nSkipped: ${skipped}`);
+    } catch {
+      toast.show("Failed to parse CSV file.", "error");
+    }
+  };
+
   const changeMasterPassword = async (): Promise<void> => {
     if (!currentMaster || !newMaster || !confirmMaster) {
       toast.show("Fill all three fields.", "error"); return;
@@ -365,8 +484,32 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backRow}>
+            <Ionicons name="arrow-back" size={16} color={Colors.accent} />
+            <Text style={styles.backText}>Home</Text>
+          </Pressable>
+        </View>
         <Text style={styles.title}><Ionicons name="settings" size={24} /> Settings</Text>
-        <Text style={styles.subtitle}>Security and backup preferences for your vault.</Text>
+        <Text style={styles.subtitle}>Security, appearance, and backup preferences for your vault.</Text>
+
+        {/* Appearance */}
+        <SectionCard title="Appearance" icon="color-palette">
+          <Text style={styles.inlineLabel}>Theme Preference</Text>
+          <View style={styles.chipRow}>
+            {(["system", "light", "dark"] as ThemePreference[]).map((mode) => (
+              <Pressable
+                key={mode}
+                onPress={() => void setPreference(mode)}
+                style={[styles.chip, preference === mode && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, preference === mode && styles.chipTextActive]}>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </SectionCard>
 
         {/* Security toggles */}
         <SectionCard title="Security" icon="lock-closed">
@@ -558,8 +701,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
           <Text style={styles.backupNote}>
             <Ionicons name="warning" size={12} /> Exports include encrypted passwords. They require the same master password to decrypt on import.
           </Text>
-          <Pressable style={styles.primaryButton} onPress={() => void exportData()}>
-            <Text style={styles.primaryButtonText}>Export Backup JSON</Text>
+          <Pressable style={styles.primaryButton} onPress={() => void exportEncrypted()}>
+            <Text style={styles.primaryButtonText}>Export Encrypted Backup (.pnb)</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => void exportData()}>
+            <Text style={styles.secondaryButtonText}>Export Plain JSON</Text>
           </Pressable>
           <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => void importData("merge")}>
             <Text style={styles.secondaryButtonText}>Import (Merge)</Text>
@@ -577,7 +723,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
               )
             }
           >
-            <Text style={styles.dangerButtonText}>Import (Replace All)</Text>
+            <Text style={styles.secondaryButtonText}>Import (Replace All)</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => void importCSV()}>
+            <Text style={styles.secondaryButtonText}>Import from CSV (Chrome / Bitwarden)</Text>
           </Pressable>
         </SectionCard>
 
@@ -589,18 +738,28 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
           <Text style={sStyles.watermarkSub}>Provided by Crevio Studio</Text>
         </View>
       </ScrollView>
-
-      <BottomTabBar
-        activeTab="Settings"
-        onTabPress={(tab) => {
-          if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Notes") navigation.navigate("Notes");
-          else if (tab === "Generator") navigation.navigate("Generator");
-        }}
-        onAddPress={() => navigation.navigate("AddPassword")}
-      />
     </SafeAreaView>
   );
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { 
+      inQuotes = !inQuotes; 
+      continue; 
+    }
+    if (line[i] === ',' && !inQuotes) { 
+      result.push(current); 
+      current = ""; 
+      continue; 
+    }
+    current += line[i];
+  }
+  result.push(current);
+  return result;
 }
 
 function SectionCard({
@@ -612,6 +771,8 @@ function SectionCard({
   icon?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const sStyles = useStyles(createSharedStyles);
   return (
     <View style={sStyles.card}>
       <Text style={sStyles.cardTitle}>
@@ -635,6 +796,8 @@ function ToggleRow({
   onPress: () => void;
   last?: boolean;
 }): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const sStyles = useStyles(createSharedStyles);
   return (
     <Pressable
       style={[sStyles.toggleRow, !last && sStyles.toggleRowBorder]}
@@ -651,7 +814,7 @@ function ToggleRow({
   );
 }
 
-const sStyles = StyleSheet.create({
+const createSharedStyles = (Colors: ThemeColors) => StyleSheet.create({
   card: {
     borderRadius: 14,
     borderWidth: 1,
@@ -700,9 +863,12 @@ const sStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 },
+  topBar: { marginBottom: 12 },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  backText: { color: Colors.accent, fontWeight: "700", fontSize: 14 },
   title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "700", marginBottom: 4 },
   subtitle: { color: Colors.textSecondary, fontSize: 13, marginBottom: 14, marginTop: 2 },
   inlineLabel: { color: Colors.textSecondary, fontSize: 12, marginBottom: 8 },

@@ -13,7 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getVaults, toggleFavourite, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useStyles, useTheme } from "../theme/ThemeContext";
 import { SiteIcon } from "../components/SiteIcon";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
@@ -23,10 +24,10 @@ import { Ionicons } from "@expo/vector-icons";
 type HomeScreenProps = StackScreenProps<RootStackParamList, "Home">;
 type SortMode = "recent" | "name" | "strength";
 
-const STRENGTH_COLORS = ["#EF4444", "#F97316", "#EAB308", "#84CC16", "#22C55E"];
-
 function StrengthRing({ score }: { score: number }): React.JSX.Element {
-  const color = score > 0 ? STRENGTH_COLORS[Math.min(score - 1, 4)] : Colors.strengthDim;
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const color = score > 0 ? Colors.strength[Math.min(score - 1, 4)] : Colors.strengthDim;
   return (
     <View style={[styles.strengthRing, { borderColor: color }]}>
       <Text style={[styles.strengthRingText, { color }]}>{score}</Text>
@@ -35,6 +36,8 @@ function StrengthRing({ score }: { score: number }): React.JSX.Element {
 }
 
 export default function HomeScreen({ navigation, route }: HomeScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [vaults, setVaults] = React.useState<VaultRow[]>([]);
   const [showPINSetup, setShowPINSetup] = React.useState(!!route.params?.showPINSetup);
@@ -123,13 +126,22 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
             <Text style={styles.title}>My Vault</Text>
             <Text style={styles.subtitle}>{vaults.length} saved credentials</Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
-            onPress={() => void loadVaults()}
-            hitSlop={8}
-          >
-            <Ionicons name="refresh" size={20} color={Colors.accent} />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <Pressable
+              style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+              onPress={() => void loadVaults()}
+              hitSlop={8}
+            >
+              <Ionicons name="refresh" size={20} color={Colors.accent} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.reloadBtn, pressed && styles.reloadBtnPressed]}
+              onPress={() => navigation.navigate("Settings")}
+              hitSlop={8}
+            >
+              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Health dashboard */}
@@ -303,10 +315,17 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
         onTabPress={(tab) => {
           if (tab === "Notes") navigation.navigate("Notes");
           else if (tab === "Generator") navigation.navigate("Generator");
-          else if (tab === "Settings") navigation.navigate("Settings");
+          else if (tab === "Auth") navigation.navigate("Authenticator");
         }}
-        onAddPress={() => navigation.navigate("AddPassword")}
       />
+
+      {/* Page-specific FAB */}
+      <Pressable 
+        style={styles.pageFab}
+        onPress={() => navigation.navigate("AddPassword")}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </Pressable>
 
       <SetupPINModal 
         visible={showPINSetup} 
@@ -316,7 +335,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   header: {
@@ -460,4 +479,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   strengthRingText: { fontSize: 11, fontWeight: "700" },
+  pageFab: {
+    position: "absolute",
+    bottom: 90,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    elevation: 14,
+    zIndex: 10,
+  },
 });

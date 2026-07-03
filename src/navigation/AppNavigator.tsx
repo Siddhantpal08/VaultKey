@@ -1,7 +1,7 @@
 import React from "react";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Platform, type AppStateStatus } from "react-native";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
+import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import LockScreen from "../screens/LockScreen";
 import MasterPasswordScreen from "../screens/MasterPasswordScreen";
 import HomeScreen from "../screens/HomeScreen";
@@ -9,6 +9,7 @@ import AddPasswordScreen from "../screens/AddPasswordScreen";
 import PasswordDetailScreen from "../screens/PasswordDetailScreen";
 import GeneratorScreen from "../screens/GeneratorScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import AuthenticatorScreen from "../screens/AuthenticatorScreen";
 import FavouritesScreen from "../screens/FavouritesScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import NotesScreen from "../screens/NotesScreen";
@@ -16,18 +17,23 @@ import AddNoteScreen from "../screens/AddNoteScreen";
 import NoteDetailScreen from "../screens/NoteDetailScreen";
 import TrashScreen from "../screens/TrashScreen";
 import AuditScreen from "../screens/AuditScreen";
+import ImportPnbScreen from "../screens/ImportPnbScreen";
+import QRScanScreen from "../screens/QRScanScreen";
 import { getSetting } from "../database/db";
 import { clearSessionKey } from "../security/crypto";
 import { useShareIntent } from "expo-share-intent";
+import * as Linking from "expo-linking";
+import { useTheme } from "../theme/ThemeContext";
 
 export type RootStackParamList = {
   Lock: undefined;
   MasterPassword: undefined;
   Home: { showPINSetup?: boolean } | undefined;
-  AddPassword: undefined;
+  AddPassword: { prefillUrl?: string; prefillSiteName?: string; prefillTotpSecret?: string } | undefined;
   PasswordDetail: { id: number };
   Generator: undefined;
   Settings: undefined;
+  Authenticator: undefined;
   Favourites: undefined;
   ForgotPassword: undefined;
   Notes: undefined;
@@ -35,12 +41,15 @@ export type RootStackParamList = {
   NoteDetail: { id: number };
   Trash: undefined;
   Audit: undefined;
+  ImportPnb: { filePath: string };
+  QRScan: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export default function AppNavigator(): React.JSX.Element {
+  const { colors: Colors } = useTheme();
   const backgroundAtRef = React.useRef<number | null>(null);
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
@@ -48,21 +57,59 @@ export default function AppNavigator(): React.JSX.Element {
     if (hasShareIntent && navigationRef.isReady()) {
       const route = navigationRef.getCurrentRoute();
       if (route && route.name !== "Lock" && route.name !== "MasterPassword") {
-        let initialTitle = shareIntent.meta?.title || "Shared Content";
-        let initialContent = shareIntent.text || "";
-        let isFile = false;
+        const file = shareIntent.files?.[0];
+        const text = shareIntent.text ?? "";
+        const sharedTitle = shareIntent.meta?.title ?? "";
         
-        if (shareIntent.files && shareIntent.files.length > 0) {
-          initialContent = shareIntent.files[0].path;
-          initialTitle = shareIntent.files[0].fileName || initialTitle;
-          isFile = true;
+        if (file) {
+          const isPnb = (file.fileName ?? "").toLowerCase().endsWith(".pnb");
+          
+          if (isPnb) {
+            navigationRef.navigate("ImportPnb", { filePath: file.path });
+            resetShareIntent();
+            return;
+          }
+          
+          navigationRef.navigate("AddNote", { 
+            initialTitle: file.fileName || "Shared File", 
+            initialContent: file.path, 
+            isFile: true 
+          });
+        } else if (isUrl(text)) {
+          navigationRef.navigate("AddPassword", {
+            prefillUrl: text,
+            prefillSiteName: extractSiteName(text),
+          });
+        } else {
+          navigationRef.navigate("AddNote", { 
+            initialTitle: sharedTitle || "Shared Note", 
+            initialContent: text, 
+            isFile: false 
+          });
         }
-        
-        navigationRef.navigate("AddNote", { initialTitle, initialContent, isFile });
         resetShareIntent();
       }
     }
   }, [hasShareIntent, shareIntent]);
+
+  React.useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      if (url.toLowerCase().endsWith(".pnb") || url.toLowerCase().includes(".pnb")) {
+        if (navigationRef.isReady()) {
+          const route = navigationRef.getCurrentRoute();
+          if (route && route.name !== "Lock" && route.name !== "MasterPassword") {
+            navigationRef.navigate("ImportPnb", { filePath: url });
+          }
+        }
+      }
+    };
+
+    Linking.getInitialURL().then(handleUrl).catch(() => {});
+
+    const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, []);
 
   React.useEffect(() => {
     const onAppStateChange = async (nextState: AppStateStatus): Promise<void> => {
@@ -117,21 +164,10 @@ export default function AppNavigator(): React.JSX.Element {
         initialRouteName="Lock"
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: "#060B17" },
-          gestureEnabled: true,
-          cardStyleInterpolator: ({ current, layouts }) => ({
-            cardStyle: {
-              opacity: current.progress,
-              transform: [
-                {
-                  translateX: current.progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [layouts.screen.width * 0.2, 0],
-                  }),
-                },
-              ],
-            },
-          }),
+          cardStyle: { backgroundColor: Colors.bg },
+          cardStyleInterpolator: (Platform.OS === "android" && Number(Platform.Version) < 28)
+            ? CardStyleInterpolators.forFadeFromBottomAndroid
+            : CardStyleInterpolators.forHorizontalIOS,
         }}
       >
         <Stack.Screen name="Lock" component={LockScreen} />
@@ -142,13 +178,30 @@ export default function AppNavigator(): React.JSX.Element {
         <Stack.Screen name="PasswordDetail" component={PasswordDetailScreen} />
         <Stack.Screen name="Generator" component={GeneratorScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Authenticator" component={AuthenticatorScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Notes" component={NotesScreen} />
         <Stack.Screen name="AddNote" component={AddNoteScreen} />
         <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
         <Stack.Screen name="Trash" component={TrashScreen} />
         <Stack.Screen name="Audit" component={AuditScreen} />
+        <Stack.Screen name="ImportPnb" component={ImportPnbScreen} />
+        <Stack.Screen name="QRScan" component={QRScanScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+// Helpers
+function isUrl(text: string): boolean {
+  return /^https?:\/\//i.test(text.trim());
+}
+
+function extractSiteName(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace(/^www\./, '').split('.')[0] ?? hostname;
+  } catch {
+    return '';
+  }
 }
