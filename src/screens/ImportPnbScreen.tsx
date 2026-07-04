@@ -29,66 +29,46 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
   const styles = useStyles(createStyles);
   const filePath = route.params?.filePath || "";
   const [isImporting, setIsImporting] = useState(false);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [v2Data, setV2Data] = useState<{ master_meta: string; data: string } | null>(null);
   const toast = useToast();
 
   const onImport = async () => {
     try {
       setIsImporting(true);
+      const fileContent = await readAsStringAsync(filePath);
       
-      // 1. Read encrypted file
-      const encryptedPayload = await readAsStringAsync(filePath);
-      
-      // 2. Set temporary session with provided password
-      // We don't have the original meta, so we just hash the password to act as key
-      // If it fails to decrypt, it means wrong password.
-      // Wait, decryptWithSession uses the global session key.
-      // A better way: The .pnb export was encrypted with the session key active at that time.
-      // That session key is derived from the master password and its meta.
-      // We need a standalone decrypt that tries to derive the key, OR we enforce that
-      // the .pnb can only be imported if the current master password matches.
-      // If we just use the current session key, we don't even need to ask for the password if unlocked!
-      // But let's assume they might be importing an old backup.
-      // Actually, standard `setSessionFromMaster` requires the salt from `master_password_meta`.
-      // The backup JSON itself contains the `settings` which includes `master_password_meta`.
-      // However, we can't read `settings` until we decrypt. Catch-22.
-      // This means the PNB must be encrypted with a key derived purely from the password (no random salt),
-      // OR we just use the *current* session key and assume the user hasn't changed their master password.
-      // Wait, in `SettingsScreen.tsx` `exportEncrypted` we used `encryptWithSession(payload)`.
-      // This uses the current session key.
-      // If we ask for the password here, we can't derive the session key without the meta.
-      // If the app is already unlocked (which it is, since we are logged in to use Share Intent usually, 
-      // or Share Intent forces unlock? Share intent happens when app is open or background).
-      // If the user's current vault is locked, they go to Lock screen first.
-      // Once unlocked, they have a session key.
-      // Let's just try to decrypt with the CURRENT session key.
-      
+      let dataToDecrypt = fileContent;
+      let isV2 = false;
+      let masterMeta = "";
+
       try {
-        const decryptedRaw = decryptWithSession(encryptedPayload);
-        const parsed = JSON.parse(decryptedRaw);
-        
-        if (parsed.schema !== "vaultkey-export-v1") {
-          throw new Error("Invalid schema");
+        const parsedFile = JSON.parse(fileContent);
+        if (parsedFile.version === 2) {
+          isV2 = true;
+          dataToDecrypt = parsedFile.data;
+          masterMeta = parsedFile.master_meta;
+          setV2Data({ master_meta: masterMeta, data: dataToDecrypt });
         }
-        
-        // 3. Prompt for merge vs replace
-        Alert.alert(
-          "Import Encrypted Backup",
-          `Found ${parsed.vaults?.length || 0} entries. Do you want to merge with your current vault or replace everything?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            { 
-              text: "Merge", 
-              onPress: () => processImport(parsed, "merge")
-            },
-            { 
-              text: "Replace All", 
-              style: "destructive",
-              onPress: () => processImport(parsed, "replace")
-            }
-          ]
-        );
+      } catch (e) {
+        // Not JSON, assume V1 raw string
+      }
+
+      // Try decrypting with the current session key first
+      try {
+        const decryptedRaw = decryptWithSession(dataToDecrypt);
+        processDecrypted(decryptedRaw);
       } catch (err) {
-        toast.show("Decryption failed. Ensure your current master password matches the backup.", "error");
+        if (isV2) {
+          setNeedsPassword(true);
+          toast.show("Backup is from a different installation. Please enter its master password.", "info");
+        } else {
+          Alert.alert(
+            "V1 Backup Unrecoverable",
+            "This backup was created in an older format and you have since reinstalled the app. The original encryption salt was lost during uninstall, making this backup cryptographically impossible to decrypt."
+          );
+        }
         setIsImporting(false);
       }
     } catch (err) {
@@ -97,11 +77,43 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
     }
   };
 
+  const onImportWithPassword = async () => {
+    if (!v2Data || !passwordInput) return;
+    setIsImporting(true);
+    try {
+      const { decryptStandalone } = require("../security/crypto");
+      const decryptedRaw = await decryptStandalone(v2Data.data, passwordInput, v2Data.master_meta);
+      processDecrypted(decryptedRaw);
+    } catch (e) {
+      toast.show("Incorrect password for this backup.", "error");
+      setIsImporting(false);
+    }
+  };
+
+  const processDecrypted = (decryptedRaw: string) => {
+    try {
+      const parsed = JSON.parse(decryptedRaw);
+      if (parsed.schema !== "vaultkey-export-v1") throw new Error("Invalid schema");
+      
+      Alert.alert(
+        "Import Encrypted Backup",
+        `Found ${parsed.vaults?.length || 0} entries. Merge with current vault or replace everything?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Merge", onPress: () => processImport(parsed, "merge") },
+          { text: "Replace All", style: "destructive", onPress: () => processImport(parsed, "replace") }
+        ]
+      );
+    } catch (e) {
+      toast.show("Backup is corrupted or invalid.", "error");
+      setIsImporting(false);
+    }
+  };
+
   const processImport = async (parsed: any, mode: "merge" | "replace") => {
     try {
       if (mode === "replace") {
         await clearVaults();
-        // Keep master password meta so we don't lock them out
         await clearSettingsExcept(["master_password", "master_password_meta", "pin_hash"]);
       }
 
@@ -116,7 +128,6 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
       if (parsed.vaults) {
         for (const row of parsed.vaults) {
           if (!row.site_name || !row.username || !row.encrypted_password) continue;
-          
           await insertVault({
             siteName: row.site_name,
             url: row.url,
@@ -164,24 +175,56 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
           <Text style={styles.fileName}>{filePath.split('/').pop()}</Text>
         </View>
 
-        <Text style={styles.infoText}>
-          The backup will be decrypted using your current active session key. 
-          If your master password has changed since this backup was made, decryption will fail.
-        </Text>
-
-        <Pressable
-          style={[styles.primaryButton, isImporting && styles.disabledButton]}
-          onPress={() => void onImport()}
-          disabled={isImporting}
-        >
-          {isImporting ? (
-            <ActivityIndicator size="small" color={Colors.textPrimary} />
-          ) : (
-            <Text style={styles.primaryButtonText}>
-              <Ionicons name="lock-open" size={16} /> Decrypt & Import
+        {!needsPassword ? (
+          <>
+            <Text style={styles.infoText}>
+              The backup will be decrypted using your current active session key.
             </Text>
-          )}
-        </Pressable>
+            <Pressable
+              style={[styles.primaryButton, isImporting && styles.disabledButton]}
+              onPress={() => void onImport()}
+              disabled={isImporting}
+            >
+              {isImporting ? (
+                <ActivityIndicator size="small" color={Colors.textPrimary} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  <Ionicons name="lock-open" size={16} /> Decrypt & Import
+                </Text>
+              )}
+            </Pressable>
+          </>
+        ) : (
+          <View style={styles.passwordContainer}>
+            <Text style={styles.passwordTitle}>Enter Backup Password</Text>
+            <Text style={styles.passwordSub}>
+              This backup uses a different encryption salt. Please enter the master password that was active when this backup was created.
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Master Password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              autoCapitalize="none"
+              autoFocus
+            />
+            <Pressable
+              style={[styles.primaryButton, (!passwordInput || isImporting) && styles.disabledButton]}
+              onPress={() => void onImportWithPassword()}
+              disabled={!passwordInput || isImporting}
+            >
+              {isImporting ? (
+                <ActivityIndicator size="small" color={Colors.textPrimary} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  <Ionicons name="key" size={16} /> Unlock Backup
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -229,4 +272,35 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   primaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: "700" },
   disabledButton: { opacity: 0.7 },
+  passwordContainer: {
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  passwordTitle: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  passwordSub: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  input: {
+    backgroundColor: Colors.bgInput,
+    borderWidth: 1,
+    borderColor: Colors.borderInput,
+    borderRadius: 10,
+    color: Colors.textPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 16,
+  },
 });

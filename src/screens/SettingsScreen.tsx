@@ -276,8 +276,16 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
         return;
       }
       const encrypted = encryptWithSession(payload);
+      const masterMeta = await getSetting("master_password_meta");
+      
+      const v2Export = JSON.stringify({
+        version: 2,
+        master_meta: masterMeta,
+        data: encrypted,
+      }, null, 2);
+
       const target = `${documentDirectory ?? ""}vaultkey-backup-${Date.now()}.pnb`;
-      await writeAsStringAsync(target, encrypted);
+      await writeAsStringAsync(target, v2Export);
       await shareAsync(target, { dialogTitle: "Save VaultKey Backup" });
     } catch {
       toast.show("Encrypted export failed.", "error");
@@ -513,30 +521,34 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
   };
 
   const setupAutoBackup = async (): Promise<void> => {
-    try {
-      toast.show("Please select a folder for automatic backups.", "info");
-      const dirUri = await requestAutoBackupDirectory();
-      if (dirUri) {
-        setAutoBackupDir(dirUri);
-        toast.show("Auto Backup location saved.", "success");
-        // Trigger a backup right away
-        const success = await triggerAutoBackup();
-        if (success) {
-          toast.show("Initial backup created in background.", "success");
-        } else {
-          toast.show("Location saved, but initial backup failed.", "warning");
-        }
-      }
-    } catch (e: any) {
-      if (e.message === "NOT_WRITABLE") {
-        Alert.alert(
-          "Folder is Read-Only",
-          "Android blocked writing to this folder. If you created a new folder, make sure you tap to OPEN it before clicking 'Use this folder' at the bottom."
-        );
-      } else {
-        toast.show(`Failed to setup Auto Backup: ${e.message || "Unknown error"}`, "error");
-      }
-    }
+    Alert.alert(
+      "Important: Selecting a Folder",
+      "Do NOT use the 'Downloads' shortcut in the sidebar menu. It is bugged on Android and will fail.\n\nInstead, open the sidebar, tap your Device Name (Internal Storage), then go to Download and create/select a folder there.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Select Folder",
+          onPress: async () => {
+            try {
+              const dirUri = await requestAutoBackupDirectory();
+              if (dirUri) {
+                setAutoBackupDir(dirUri);
+                toast.show("Auto Backup location saved.", "success");
+                // Trigger a backup right away
+                const success = await triggerAutoBackup();
+                if (success) {
+                  toast.show("Initial backup created successfully.", "success");
+                } else {
+                  toast.show("Location saved, but initial backup failed. Check folder permissions.", "warning");
+                }
+              }
+            } catch (e: any) {
+              toast.show(`Failed to setup Auto Backup: ${e.message || "Unknown error"}`, "error");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const turnOffAutoBackup = async (): Promise<void> => {
@@ -569,8 +581,8 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
       } else {
         toast.show("App is up to date. If expecting major changes, check website for new APK.", "success");
       }
-    } catch (e) {
-      toast.show("Failed to check for updates. Ensure you have internet.", "error");
+    } catch (e: any) {
+      toast.show(`Update check failed: ${e.message || "Unknown error"}`, "error");
     } finally {
       setCheckingUpdate(false);
     }

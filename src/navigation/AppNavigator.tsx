@@ -128,7 +128,10 @@ export default function AppNavigator(): React.JSX.Element {
       }
 
       const timeoutSetting = await getSetting("lock_timeout_minutes");
-      const timeoutMinutes = Number(timeoutSetting ?? "5");
+      let timeoutMinutes = Number(timeoutSetting ?? "5");
+      if (isNaN(timeoutMinutes)) {
+        timeoutMinutes = 5;
+      }
       const elapsedMs = Date.now() - backgroundAtRef.current;
       const thresholdMs = Math.max(1, timeoutMinutes) * 60 * 1000;
       backgroundAtRef.current = null;

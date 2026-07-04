@@ -202,3 +202,24 @@ export function decryptWithSession(cipherText: string): string {
   const plainBytes = aes.decrypt(fullCiphertext);
   return Buffer.from(plainBytes).toString("utf8");
 }
+
+export async function decryptStandalone(cipherText: string, password: string, masterMetaJson: string): Promise<string> {
+  const parsed = JSON.parse(masterMetaJson) as MasterMeta;
+  const key = await deriveKey(password, parsed.saltB64, parsed.iterations);
+  
+  if (!cipherText.startsWith("v1:")) return cipherText;
+  const parts = cipherText.split(":");
+  if (parts.length !== 4) throw new Error("Invalid ciphertext format.");
+
+  const iv = Buffer.from(parts[1], "base64");
+  const authTag = Buffer.from(parts[2], "base64");
+  const encrypted = Buffer.from(parts[3], "base64");
+
+  const aes = gcm(key, iv);
+  const fullCiphertext = new Uint8Array(encrypted.length + authTag.length);
+  fullCiphertext.set(encrypted, 0);
+  fullCiphertext.set(authTag, encrypted.length);
+
+  const plainBytes = aes.decrypt(fullCiphertext);
+  return Buffer.from(plainBytes).toString("utf8");
+}
