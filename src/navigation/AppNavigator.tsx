@@ -32,7 +32,7 @@ export type RootStackParamList = {
   AddPassword: { prefillUrl?: string; prefillSiteName?: string; prefillTotpSecret?: string } | undefined;
   PasswordDetail: { id: number };
   Generator: undefined;
-  Settings: undefined;
+  Settings: { scrollTo?: string } | undefined;
   Authenticator: undefined;
   Favourites: undefined;
   ForgotPassword: undefined;

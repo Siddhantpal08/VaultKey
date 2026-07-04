@@ -114,9 +114,9 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.title}><Ionicons name="flash" size={24} /> Generator</Text>
             <Text style={styles.subtitle}>Create cryptographically strong passwords instantly.</Text>
           </View>
@@ -140,7 +140,7 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
 
         {/* Length */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Password Length</Text>
+          <Text style={styles.sectionLabel}>Password Length: {length}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {LENGTH_OPTIONS.map((count) => (
               <Pressable
@@ -355,7 +355,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
     padding: 10,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   historyText: {
     flex: 1,

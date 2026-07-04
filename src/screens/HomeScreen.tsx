@@ -9,9 +9,11 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getVaults, toggleFavourite, type VaultRow } from "../database/db";
+import { getVaults, toggleFavourite, getSetting, upsertSetting, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
@@ -44,6 +46,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [sortMode, setSortMode] = React.useState<SortMode>("recent");
+  const [showAutoBackupPrompt, setShowAutoBackupPrompt] = React.useState<boolean>(false);
   const toast = useToast();
 
   const loadVaults = React.useCallback(async (): Promise<void> => {
@@ -52,6 +55,25 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
     setVaults(rows);
     setIsLoading(false);
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const checkPrompt = async () => {
+        try {
+          const prompted = await getSetting("auto_backup_prompted_v2");
+          const autoBackupDir = await getSetting("auto_backup_uri");
+          if (prompted !== "true" && !autoBackupDir && mounted) {
+            setShowAutoBackupPrompt(true);
+          }
+        } catch (e) {
+          // ignore
+        }
+      };
+      void checkPrompt();
+      return () => { mounted = false; };
+    }, [navigation])
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -331,6 +353,50 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
         visible={showPINSetup} 
         onComplete={() => setShowPINSetup(false)} 
       />
+
+      <Modal
+        visible={showAutoBackupPrompt}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="cloud-upload" size={48} color={Colors.accent} style={{ alignSelf: "center", marginBottom: 16 }} />
+            <Text style={styles.modalTitle}>Enable Auto Backup?</Text>
+            <Text style={styles.modalText}>
+              Keep your data completely safe. Automatically save an encrypted backup to your device whenever you make changes, so you never lose your vault even if the app is uninstalled.
+            </Text>
+            <Pressable
+              style={[styles.primaryButton, { marginTop: 24 }]}
+              onPress={() => {
+                setShowAutoBackupPrompt(false);
+                void upsertSetting("auto_backup_prompted_v2", "true");
+                navigation.navigate("Settings", { scrollTo: "backup" });
+              }}
+            >
+              <Text style={styles.primaryButtonText}>Enable Now</Text>
+            </Pressable>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={() => {
+                setShowAutoBackupPrompt(false);
+                // "Not Right Now" only dismisses for the current session
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Not Right Now</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.cancelButton, { marginTop: 0 }]}
+              onPress={() => {
+                setShowAutoBackupPrompt(false);
+                void upsertSetting("auto_backup_prompted_v2", "true");
+              }}
+            >
+              <Text style={[styles.cancelButtonText, { fontSize: 12, opacity: 0.7 }]}>Don't Ask Again</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -481,7 +547,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   strengthRingText: { fontSize: 11, fontWeight: "700" },
   pageFab: {
     position: "absolute",
-    bottom: 90,
+    bottom: 120,
     right: 20,
     width: 56,
     height: 56,
@@ -496,4 +562,53 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 14,
     zIndex: 10,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  modalText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  primaryButton: {
+    backgroundColor: Colors.accent,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cancelButton: {
+    paddingVertical: 14,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    fontWeight: "500",
+  }
 });

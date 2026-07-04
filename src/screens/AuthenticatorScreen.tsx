@@ -123,13 +123,6 @@ export default function AuthenticatorScreen({ navigation }: AuthenticatorScreenP
           )}
         />
         
-        {/* Floating Action Button */}
-        <Pressable 
-          style={styles.fab} 
-          onPress={() => setShowOptions(true)}
-        >
-          <Ionicons name="add" size={32} color="#FFFFFF" />
-        </Pressable>
       </View>
 
       {/* Options Modal */}
@@ -225,6 +218,14 @@ export default function AuthenticatorScreen({ navigation }: AuthenticatorScreenP
           else if (tab === "Generator") navigation.navigate("Generator");
         }}
       />
+
+      {/* Floating Action Button */}
+      <Pressable 
+        style={styles.fab} 
+        onPress={() => setShowOptions(true)}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -330,11 +331,11 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    bottom: 120,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",

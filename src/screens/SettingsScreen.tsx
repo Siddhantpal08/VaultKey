@@ -46,6 +46,13 @@ import { useStyles, useTheme, type ThemePreference } from "../theme/ThemeContext
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
+import * as Updates from "expo-updates";
+import {
+  getAutoBackupDirectory,
+  requestAutoBackupDirectory,
+  disableAutoBackup,
+  triggerAutoBackup,
+} from "../database/backup";
 
 type SettingsScreenProps = StackScreenProps<RootStackParamList, "Settings">;
 
@@ -92,14 +99,30 @@ function boolToString(value: boolean): string {
   return value ? "true" : "false";
 }
 
+function formatUri(uri: string): string {
+  try {
+    const decoded = decodeURIComponent(uri);
+    const parts = decoded.split("tree/");
+    if (parts.length > 1) {
+      let path = parts[1].replace("%3A", "/").replace("primary:", "Internal Storage/");
+      // Some phones return primary:Download others return primary:Downloads
+      return path;
+    }
+    return decoded;
+  } catch {
+    return uri;
+  }
+}
+
 function toMergeKey(siteName: string, username: string): string {
   return `${siteName.trim().toLowerCase()}::${username.trim().toLowerCase()}`;
 }
 
-export default function SettingsScreen({ navigation }: SettingsScreenProps): React.JSX.Element {
+export default function SettingsScreen({ navigation, route }: SettingsScreenProps): React.JSX.Element {
   const { colors: Colors, preference, setPreference } = useTheme();
   const styles = useStyles(createStyles);
   const sStyles = useStyles(createSharedStyles);
+  const scrollViewRef = React.useRef<ScrollView>(null);
   const [state, setState] = React.useState<SettingsState>({
     biometricsEnabled: true,
     autoLockOnBackground: true,
@@ -124,6 +147,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
   const [confirmPIN, setConfirmPIN] = React.useState<string>("");
   const [savingPIN, setSavingPIN] = React.useState<boolean>(false);
 
+  // Auto Backup and Updates
+  const [autoBackupDir, setAutoBackupDir] = React.useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = React.useState<boolean>(false);
+
   const toast = useToast();
 
   React.useEffect(() => {
@@ -144,11 +171,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
         clipboardClearSeconds: Number(map.get(KEYS.clipboardClearSeconds) ?? "30"),
       });
       setHasPIN(pinHash !== null);
+      setAutoBackupDir(await getAutoBackupDirectory());
       setIsReady(true);
     };
     void load();
     return () => { mounted = false; };
   }, []);
+
+  React.useEffect(() => {
+    if (isReady && route.params?.scrollTo === "backup") {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 500);
+    }
+  }, [isReady, route.params?.scrollTo]);
 
   const persist = async (next: SettingsState): Promise<void> => {
     await upsertSetting(KEYS.biometricsEnabled, boolToString(next.biometricsEnabled));
@@ -476,6 +512,70 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
     }
   };
 
+  const setupAutoBackup = async (): Promise<void> => {
+    try {
+      toast.show("Please select a folder for automatic backups.", "info");
+      const dirUri = await requestAutoBackupDirectory();
+      if (dirUri) {
+        setAutoBackupDir(dirUri);
+        toast.show("Auto Backup location saved.", "success");
+        // Trigger a backup right away
+        const success = await triggerAutoBackup();
+        if (success) {
+          toast.show("Initial backup created in background.", "success");
+        } else {
+          toast.show("Location saved, but initial backup failed.", "warning");
+        }
+      }
+    } catch (e: any) {
+      if (e.message === "NOT_WRITABLE") {
+        Alert.alert(
+          "Folder is Read-Only",
+          "Android blocked writing to this folder. If you created a new folder, make sure you tap to OPEN it before clicking 'Use this folder' at the bottom."
+        );
+      } else {
+        toast.show(`Failed to setup Auto Backup: ${e.message || "Unknown error"}`, "error");
+      }
+    }
+  };
+
+  const turnOffAutoBackup = async (): Promise<void> => {
+    await disableAutoBackup();
+    await upsertSetting("auto_backup_prompted_v2", "false");
+    setAutoBackupDir(null);
+    toast.show("Auto Backup disabled.", "info");
+  };
+
+  const checkForUpdates = async (): Promise<void> => {
+    try {
+      if (__DEV__) {
+        toast.show("Updates cannot be checked in development mode.", "info");
+        return;
+      }
+      setCheckingUpdate(true);
+      toast.show("Checking for updates...", "info");
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        toast.show("Update found! Downloading...", "info");
+        await Updates.fetchUpdateAsync();
+        Alert.alert(
+          "Update Downloaded",
+          "A new update has been downloaded and is ready to apply. Restart now?",
+          [
+            { text: "Later", style: "cancel" },
+            { text: "Restart", style: "destructive", onPress: () => void Updates.reloadAsync() },
+          ]
+        );
+      } else {
+        toast.show("App is up to date. If expecting major changes, check website for new APK.", "success");
+      }
+    } catch (e) {
+      toast.show("Failed to check for updates. Ensure you have internet.", "error");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   if (!isReady) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -489,7 +589,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backRow}>
             <Ionicons name="arrow-back" size={16} color={Colors.accent} />
@@ -700,6 +800,46 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps): Rea
           <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => navigation.navigate("Trash")}>
             <Text style={styles.secondaryButtonText}>Recently Deleted (Trash)</Text>
           </Pressable>
+        </SectionCard>
+
+        {/* Updates */}
+        <SectionCard title="App Updates" icon="cloud-download">
+          <Text style={styles.inlineLabel}>
+            Check for OTA (Over-The-Air) updates. Major releases may require downloading a new APK from our website.
+          </Text>
+          <Pressable
+            style={[styles.primaryButton, checkingUpdate && styles.disabledButton]}
+            onPress={() => void checkForUpdates()}
+            disabled={checkingUpdate}
+          >
+            <Text style={styles.primaryButtonText}>
+              {checkingUpdate ? "Checking..." : "Check for Updates"}
+            </Text>
+          </Pressable>
+        </SectionCard>
+
+        {/* Auto Backup */}
+        <SectionCard title="Auto Backup" icon="sync">
+          <Text style={styles.inlineLabel}>
+            Automatically export an encrypted backup (.pnb) to your device every time a change is made.
+          </Text>
+          {autoBackupDir ? (
+            <View>
+              <Text style={styles.backupNote} numberOfLines={2}>
+                <Ionicons name="checkmark-circle" size={12} color={Colors.success} /> Saving to: {formatUri(autoBackupDir)}
+              </Text>
+              <Pressable style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => void setupAutoBackup()}>
+                <Text style={styles.secondaryButtonText}>Change Location</Text>
+              </Pressable>
+              <Pressable style={[styles.dangerButton, { marginTop: 8 }]} onPress={() => void turnOffAutoBackup()}>
+                <Text style={styles.dangerButtonText}>Disable Auto Backup</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.primaryButton} onPress={() => void setupAutoBackup()}>
+              <Text style={styles.primaryButtonText}>Enable Auto Backup</Text>
+            </Pressable>
+          )}
         </SectionCard>
 
         {/* Backup */}

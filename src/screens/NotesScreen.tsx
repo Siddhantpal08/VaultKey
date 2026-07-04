@@ -216,7 +216,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   pageFab: {
     position: "absolute",
-    bottom: 90,
+    bottom: 120,
     right: 20,
     width: 56,
     height: 56,

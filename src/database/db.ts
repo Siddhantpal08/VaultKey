@@ -1,4 +1,5 @@
 import * as SQLite from "expo-sqlite";
+import { triggerAutoBackup } from "./backup";
 
 const DATABASE_NAME = "vaultkey.db";
 
@@ -205,6 +206,7 @@ export async function getFavourites(): Promise<VaultRow[]> {
 export async function toggleFavourite(id: number, value: 0 | 1): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(`UPDATE vaults SET favourite = ? WHERE id = ?;`, [value, id]);
+  void triggerAutoBackup();
 }
 
 export type CreateVaultInput = {
@@ -256,6 +258,7 @@ export async function insertVault(input: CreateVaultInput): Promise<number> {
     ],
   );
 
+  void triggerAutoBackup();
   return result.lastInsertRowId;
 }
 
@@ -349,6 +352,7 @@ export async function updateVault(input: UpdateVaultInput): Promise<void> {
       input.id,
     ],
   );
+  void triggerAutoBackup();
 }
 
 export async function deleteVault(id: number): Promise<void> {
@@ -361,6 +365,7 @@ export async function deleteVault(id: number): Promise<void> {
     `,
     [new Date().toISOString(), id],
   );
+  void triggerAutoBackup();
 }
 
 export async function restoreVault(id: number): Promise<void> {
@@ -373,6 +378,7 @@ export async function restoreVault(id: number): Promise<void> {
     `,
     [id],
   );
+  void triggerAutoBackup();
 }
 
 export async function hardDeleteVault(id: number): Promise<void> {
@@ -384,6 +390,7 @@ export async function hardDeleteVault(id: number): Promise<void> {
     `,
     [id],
   );
+  void triggerAutoBackup();
 }
 
 export async function getDeletedItems(): Promise<VaultRow[]> {
@@ -422,6 +429,7 @@ export async function clearVaults(): Promise<void> {
     `,
     [],
   );
+  void triggerAutoBackup();
 }
 
 export async function clearSettingsExcept(keysToKeep: string[]): Promise<void> {

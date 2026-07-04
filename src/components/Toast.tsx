@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
 
-type ToastType = "success" | "error" | "info";
+type ToastType = "success" | "error" | "info" | "warning";
 
 type ToastEntry = {
   id: number;
@@ -72,6 +72,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               {t.type === "success" ? <Ionicons name="checkmark-circle" size={16} color={Colors.success} /> : 
                t.type === "error" ? <Ionicons name="close-circle" size={16} color={Colors.errorText} /> : 
+               t.type === "warning" ? <Ionicons name="warning" size={16} color={Colors.warning} /> :
                <Ionicons name="information-circle" size={16} color={Colors.accent} />}
               <Text style={styles.toastText}>
                 {t.message}
@@ -119,6 +120,10 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   error: {
     borderColor: "rgba(239,68,68,0.5)",
     backgroundColor: "rgba(35,15,15,0.97)",
+  },
+  warning: {
+    borderColor: "rgba(245,158,11,0.5)",
+    backgroundColor: "rgba(35,30,15,0.97)",
   },
   toastText: {
     color: Colors.textPrimary,

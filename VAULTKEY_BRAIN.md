@@ -35,6 +35,8 @@ This file serves as the context repository for the AI assistant to understand th
 - **Secure Notes:** Stores text-only secure notes (identified in DB via `is_note = 1`).
 - **Generator:** Strong password generation.
 - **Security Settings:** Auto-lock timeout, PIN, Biometrics, Clipboard auto-clear, Backup/Restore.
+- **Auto Backup:** Silently exports an encrypted `.pnb` backup using the Storage Access Framework (SAF) upon every data modification.
+- **Auto Updates (OTA):** Uses `expo-updates` to check and prompt for minor over-the-air updates.
 - **Share Intent & .pnb Support:** Intercepts shared files/text from other apps and saves them into VaultKey.
 - **Audit Dashboard:** Checks password strength, duplicates, and breaches.
 - **Trash / Recycle Bin:** Soft-deleted items can be restored.
