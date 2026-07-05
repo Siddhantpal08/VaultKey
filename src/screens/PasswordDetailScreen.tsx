@@ -79,7 +79,7 @@ export default function PasswordDetailScreen({
     if (!row) {
       setIsLoading(false);
       Alert.alert("Not found", "Password entry no longer exists.", [
-        { text: "OK", onPress: () => navigation.replace("Home") },
+        { text: "OK", onPress: () => navigation.replace("MainTabs") },
       ]);
       return;
     }
@@ -162,7 +162,7 @@ export default function PasswordDetailScreen({
     try {
       await deleteVault(route.params.id);
       toast.show("Entry deleted", "info");
-      navigation.replace("Home");
+      navigation.replace("MainTabs");
     } catch {
       toast.show("Delete failed. Please try again.", "error");
     }

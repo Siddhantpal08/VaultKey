@@ -11,13 +11,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSetting, upsertSetting } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import type { MainTabParamList } from "../navigation/MainTabNavigator";
+import { CompositeScreenProps } from "@react-navigation/native";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
 
-type GeneratorScreenProps = StackScreenProps<RootStackParamList, "Generator">;
+type GeneratorScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Generator">,
+  StackScreenProps<RootStackParamList>
+>;
 
 const LOWER = "abcdefghijkmnopqrstuvwxyz";
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -196,15 +202,6 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
           </View>
         ) : null}
       </View>
-
-      <BottomTabBar
-        activeTab="Generator"
-        onTabPress={(tab) => {
-          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
-          else if (tab === "Notes") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Notes" }] });
-          else if (tab === "Auth") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Authenticator" }] });
-        }}
-      />
     </SafeAreaView>
   );
 }

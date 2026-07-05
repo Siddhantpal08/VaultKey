@@ -197,7 +197,7 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
         return;
       }
     }
-    navigation.replace("Home");
+    navigation.replace("MainTabs");
   };
 
   const consumeAttempt = (): void => {

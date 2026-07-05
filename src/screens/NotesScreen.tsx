@@ -13,12 +13,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getNotes, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import type { MainTabParamList } from "../navigation/MainTabNavigator";
+import { CompositeScreenProps } from "@react-navigation/native";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { Ionicons } from "@expo/vector-icons";
 
-type NotesScreenProps = StackScreenProps<RootStackParamList, "Notes">;
+type NotesScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Notes">,
+  StackScreenProps<RootStackParamList>
+>;
 
 export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX.Element {
   const { colors: Colors } = useTheme();
@@ -123,15 +129,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX
           />
         )}
       </View>
-
-      <BottomTabBar
-        activeTab="Notes"
-        onTabPress={(tab) => {
-          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
-          else if (tab === "Generator") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Generator" }] });
-          else if (tab === "Auth") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Authenticator" }] });
-        }}
-      />
 
       {/* Page-specific FAB */}
       <Pressable 

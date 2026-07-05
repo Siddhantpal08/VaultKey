@@ -123,7 +123,7 @@ export default function MasterPasswordScreen({
 
       navigation.reset({
         index: 0,
-        routes: [{ name: "Home", params: { showPINSetup: !pinHash } }],
+        routes: [{ name: "MainTabs", params: { screen: "Home", params: { showPINSetup: !pinHash } } }],
       });
     } catch (e) {
       console.error("MasterPassword save error:", e);

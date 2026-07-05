@@ -196,7 +196,7 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
         skipped > 0
           ? `Successfully imported ${inserted} entries (${skipped} skipped).`
           : `Successfully imported ${inserted} entries.`,
-        [{ text: "OK", onPress: () => navigation.navigate("Home") }]
+        [{ text: "OK", onPress: () => navigation.navigate("MainTabs") }]
       );
     } catch {
       toast.show("Error during import process.", "error");

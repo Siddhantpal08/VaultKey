@@ -3,73 +3,65 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
-export type TabName = "Vault" | "Notes" | "Generator" | "Auth";
+export type TabName = "Home" | "Notes" | "Generator" | "Authenticator";
 
-type Tab = {
+type TabDefinition = {
   name: TabName;
   icon: string;
   label: string;
 };
 
-const TABS: Tab[] = [
-  { name: "Vault", icon: "shield-checkmark", label: "Vault" },
+const TABS: TabDefinition[] = [
+  { name: "Home", icon: "shield-checkmark", label: "Vault" },
   { name: "Notes", icon: "document-text", label: "Notes" },
   { name: "Generator", icon: "flash", label: "Generate" },
-  { name: "Auth", icon: "timer-outline", label: "Auth" },
+  { name: "Authenticator", icon: "timer-outline", label: "Auth" },
 ];
 
-type BottomTabBarProps = {
-  activeTab: TabName;
-  onTabPress: (tab: TabName) => void;
-};
-
-export function BottomTabBar({ activeTab, onTabPress }: BottomTabBarProps): React.JSX.Element {
+export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarProps): React.JSX.Element {
   const { colors: Colors } = useTheme();
   const styles = useStyles(createStyles);
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.bar}>
-        {TABS.slice(0, 2).map((tab) => {
-          const isActive = tab.name === activeTab;
+        {TABS.map((tabInfo, index) => {
+          // Find the route in the navigator state that matches our expected tab name
+          const routeIndex = state.routes.findIndex(r => r.name === tabInfo.name);
+          const route = state.routes[routeIndex];
+          const isFocused = state.index === routeIndex;
+
+          const onPress = () => {
+            if (!route) return;
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
           return (
             <Pressable
-              key={tab.name}
+              key={tabInfo.name}
               style={styles.tabItem}
-              onPress={() => onTabPress(tab.name)}
+              onPress={onPress}
             >
-              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+              <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
                 <Ionicons
-                  name={tab.icon as any}
+                  name={tabInfo.icon as any}
                   size={20}
-                  color={isActive ? Colors.tabActive : Colors.tabInactive}
-                  style={[styles.tabIcon, isActive && styles.tabIconActive]}
+                  color={isFocused ? Colors.tabActive : Colors.tabInactive}
+                  style={[styles.tabIcon, isFocused && styles.tabIconActive]}
                 />
               </View>
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-        {TABS.slice(2, 4).map((tab) => {
-          const isActive = tab.name === activeTab;
-          return (
-            <Pressable
-              key={tab.name}
-              style={styles.tabItem}
-              onPress={() => onTabPress(tab.name)}
-            >
-              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                <Ionicons
-                  name={tab.icon as any}
-                  size={20}
-                  color={isActive ? Colors.tabActive : Colors.tabInactive}
-                  style={[styles.tabIcon, isActive && styles.tabIconActive]}
-                />
-              </View>
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                {tab.label}
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+                {tabInfo.label}
               </Text>
             </Pressable>
           );

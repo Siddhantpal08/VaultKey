@@ -12,6 +12,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getVaults, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import type { MainTabParamList } from "../navigation/MainTabNavigator";
+import { CompositeScreenProps } from "@react-navigation/native";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { Colors } from "../theme/colors";
 import { SiteIcon } from "../components/SiteIcon";
 import { BottomTabBar } from "../components/BottomTabBar";
@@ -24,7 +27,10 @@ import { useStyles, useTheme } from "../theme/ThemeContext";
 import { insertVault } from "../database/db";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
 
-type AuthenticatorScreenProps = StackScreenProps<RootStackParamList, "Authenticator">;
+type AuthenticatorScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Authenticator">,
+  StackScreenProps<RootStackParamList>
+>;
 
 export default function AuthenticatorScreen({ navigation }: AuthenticatorScreenProps): React.JSX.Element {
   const { colors: Colors, isDark } = useTheme();
@@ -209,15 +215,6 @@ export default function AuthenticatorScreen({ navigation }: AuthenticatorScreenP
           </View>
         </View>
       )}
-
-      <BottomTabBar
-        activeTab="Auth"
-        onTabPress={(tab) => {
-          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
-          else if (tab === "Notes") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Notes" }] });
-          else if (tab === "Generator") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Generator" }] });
-        }}
-      />
 
       {/* Floating Action Button */}
       <Pressable 

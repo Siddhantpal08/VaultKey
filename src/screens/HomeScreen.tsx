@@ -15,6 +15,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getVaults, toggleFavourite, getSetting, upsertSetting, type VaultRow } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import type { MainTabParamList } from "../navigation/MainTabNavigator";
+import { CompositeScreenProps } from "@react-navigation/native";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
 import { SiteIcon } from "../components/SiteIcon";
@@ -23,7 +26,10 @@ import { useToast } from "../components/Toast";
 import { SetupPINModal } from "../components/SetupPINModal";
 import { Ionicons } from "@expo/vector-icons";
 
-type HomeScreenProps = StackScreenProps<RootStackParamList, "Home">;
+type HomeScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Home">,
+  StackScreenProps<RootStackParamList>
+>;
 type SortMode = "recent" | "name" | "strength";
 
 function StrengthRing({ score }: { score: number }): React.JSX.Element {
@@ -42,7 +48,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
   const styles = useStyles(createStyles);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [vaults, setVaults] = React.useState<VaultRow[]>([]);
-  const [showPINSetup, setShowPINSetup] = React.useState(!!route.params?.showPINSetup);
+  const [showPINSetup, setShowPINSetup] = React.useState(!!(route.params as any)?.showPINSetup);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [sortMode, setSortMode] = React.useState<SortMode>("recent");
@@ -185,7 +191,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
               {totalWeak > 0 ? (
                 <Pressable
                   style={styles.healthAction}
-                  onPress={() => navigation.navigate("Generator")}
+                  onPress={() => (navigation as any).navigate("Generator")}
                 >
                   <Text style={styles.healthActionText}>
                     <Ionicons name="warning" size={12} color={Colors.warning} /> {totalWeak} weak — fix now
@@ -340,16 +346,8 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
         )}
       </View>
 
-      <BottomTabBar
-        activeTab="Vault"
-        onTabPress={(tab) => {
-          if (tab === "Notes") navigation.navigate("Notes");
-          else if (tab === "Generator") navigation.navigate("Generator");
-          else if (tab === "Auth") navigation.navigate("Authenticator");
-        }}
-      />
-
       {/* Page-specific FAB */}
+
       <Pressable 
         style={styles.pageFab}
         onPress={() => navigation.navigate("AddPassword")}

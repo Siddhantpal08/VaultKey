@@ -1,27 +1,26 @@
 import React from "react";
 import { AppState, type AppStateStatus } from "react-native";
-import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
+import { NavigationContainer, createNavigationContainerRef, DefaultTheme } from "@react-navigation/native";
+import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import LockScreen from "../screens/LockScreen";
 import MasterPasswordScreen from "../screens/MasterPasswordScreen";
-import HomeScreen from "../screens/HomeScreen";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import AddPasswordScreen from "../screens/AddPasswordScreen";
 import PasswordDetailScreen from "../screens/PasswordDetailScreen";
-import GeneratorScreen from "../screens/GeneratorScreen";
 import SettingsScreen from "../screens/SettingsScreen";
-import AuthenticatorScreen from "../screens/AuthenticatorScreen";
 import FavouritesScreen from "../screens/FavouritesScreen";
-import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
-import NotesScreen from "../screens/NotesScreen";
 import AddNoteScreen from "../screens/AddNoteScreen";
 import NoteDetailScreen from "../screens/NoteDetailScreen";
+
 import TrashScreen from "../screens/TrashScreen";
 import AuditScreen from "../screens/AuditScreen";
 import ImportPnbScreen from "../screens/ImportPnbScreen";
 import QRScanScreen from "../screens/QRScanScreen";
 import OnboardingScreen from "../screens/OnboardingScreen";
+import MainTabNavigator from "./MainTabNavigator";
 
 import { getSetting } from "../database/db";
+
 import { clearSessionKey } from "../security/crypto";
 import { useShareIntent } from "expo-share-intent";
 import * as Linking from "expo-linking";
@@ -31,16 +30,14 @@ export type RootStackParamList = {
   Lock: undefined;
   Onboarding: undefined;
   MasterPassword: undefined;
-  Home: { showPINSetup?: boolean } | undefined;
+  MainTabs: undefined;
   AddPassword: { prefillUrl?: string; prefillSiteName?: string; prefillTotpSecret?: string } | undefined;
   PasswordDetail: { id: number };
-  Generator: undefined;
   Settings: { scrollTo?: string } | undefined;
-  Authenticator: undefined;
   Favourites: undefined;
   ForgotPassword: undefined;
-  Notes: undefined;
   AddNote: { initialTitle?: string; initialContent?: string; isFile?: boolean } | undefined;
+
   NoteDetail: { id: number };
   Trash: undefined;
   Audit: undefined;
@@ -60,7 +57,7 @@ export default function AppNavigator(): React.JSX.Element {
   React.useEffect(() => {
     if (hasShareIntent && navigationRef.isReady()) {
       const route = navigationRef.getCurrentRoute();
-      if (route && route.name !== "Lock" && route.name !== "MasterPassword") {
+      if (route && route.name !== "Lock" && route.name !== "MasterPassword" && route.name !== "Onboarding") {
         const file = shareIntent.files?.[0];
         const text = shareIntent.text ?? "";
         const sharedTitle = shareIntent.meta?.title ?? "";
@@ -102,7 +99,7 @@ export default function AppNavigator(): React.JSX.Element {
       if (url.toLowerCase().endsWith(".pnb") || url.toLowerCase().includes(".pnb")) {
         if (navigationRef.isReady()) {
           const route = navigationRef.getCurrentRoute();
-          if (route && route.name !== "Lock" && route.name !== "MasterPassword") {
+          if (route && route.name !== "Lock" && route.name !== "MasterPassword" && route.name !== "Onboarding") {
             navigationRef.navigate("ImportPnb", { filePath: url });
           }
         }
@@ -165,31 +162,37 @@ export default function AppNavigator(): React.JSX.Element {
     };
   }, []);
 
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: Colors.bg,
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator
         initialRouteName="Lock"
         screenOptions={{
           headerShown: false,
           cardStyle: { backgroundColor: Colors.bg },
-          // Animations are disabled globally to prevent the Lock screen from
-          // briefly flashing through during screen transitions.
-          animationEnabled: false,
+          cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
         }}
       >
         <Stack.Screen name="Lock" component={LockScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="MasterPassword" component={MasterPasswordScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
         <Stack.Screen name="Favourites" component={FavouritesScreen} />
         <Stack.Screen name="AddPassword" component={AddPasswordScreen} />
         <Stack.Screen name="PasswordDetail" component={PasswordDetailScreen} />
-        <Stack.Screen name="Generator" component={GeneratorScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="Authenticator" component={AuthenticatorScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <Stack.Screen name="Notes" component={NotesScreen} />
         <Stack.Screen name="AddNote" component={AddNoteScreen} />
+
+
+
         <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
         <Stack.Screen name="Trash" component={TrashScreen} />
         <Stack.Screen name="Audit" component={AuditScreen} />
