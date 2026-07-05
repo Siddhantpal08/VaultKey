@@ -31,7 +31,7 @@ export default function Hero({ onDownloadClick }: HeroProps) {
           <Lock className="w-4 h-4" /> 100% Offline Vault
         </div>
         
-        <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500 mb-6 max-w-5xl tracking-tight leading-[1.1] animate-fade-in-up [animation-delay:100ms] uppercase">
+        <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500 mb-6 max-w-5xl tracking-tight leading-[1.1] animate-fade-in-up [animation-delay:100ms] uppercase">
           protect your <br />
           <span className="gradient-text-blue">data.</span>
         </h1>
