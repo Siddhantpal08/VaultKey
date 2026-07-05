@@ -555,7 +555,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   strengthRingText: { fontSize: 11, fontWeight: "700" },
   pageFab: {
     position: "absolute",
-    bottom: 120,
+    bottom: 24,
     right: 20,
     width: 56,
     height: 56,

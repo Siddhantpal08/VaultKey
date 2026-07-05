@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -162,7 +163,7 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps):
           setCurrentIndex(newIndex);
         }}
         renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
+          <ScrollView style={{ flex: 1, width }} contentContainerStyle={styles.slide} showsVerticalScrollIndicator={false}>
             {/* Icon hero */}
             <View style={[styles.iconHero, { backgroundColor: item.iconBg }]}>
               <Ionicons name={item.icon as any} size={52} color={item.iconColor} />
@@ -189,7 +190,7 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps):
                 ))}
               </View>
             )}
-          </View>
+          </ScrollView>
         )}
       />
 
@@ -258,9 +259,10 @@ const createStyles = (Colors: ThemeColors) =>
       fontWeight: "600",
     },
     slide: {
-      flex: 1,
+      flexGrow: 1,
       paddingHorizontal: 28,
       paddingTop: 60,
+      paddingBottom: 120, // Add bottom padding to account for the absolute footer
       alignItems: "center",
     },
     iconHero: {

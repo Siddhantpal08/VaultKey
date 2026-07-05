@@ -88,23 +88,25 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 4,
   },
   iconWrap: {
-    width: 36,
-    height: 32,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 10,
   },
   iconWrapActive: {
-    backgroundColor: Colors.accentBg,
+    // No background, just clean icon
   },
   tabIcon: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
   tabIconActive: {
     opacity: 1,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4, // Android glow
   },
   tabLabel: {
     fontSize: 10,
@@ -113,5 +115,8 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   tabLabelActive: {
     color: Colors.tabActive,
+    textShadowColor: Colors.accent,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
 });

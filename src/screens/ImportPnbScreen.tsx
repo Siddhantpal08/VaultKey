@@ -140,6 +140,15 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
     oldMeta = "",
   ) => {
     try {
+      // Get current entries to check for duplicates when merging
+      let currentVaults: any[] = [];
+      if (mode === "merge") {
+        const { getVaults, getNotes } = require("../database/db");
+        const vaults = await getVaults();
+        const notes = await getNotes();
+        currentVaults = [...vaults, ...notes];
+      }
+
       if (mode === "replace") {
         await clearVaults();
         await clearSettingsExcept(["master_password", "master_password_meta", "pin_hash"]);
@@ -158,7 +167,11 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
         for (const row of parsed.vaults) {
           // Skip deleted entries and entries without required fields
           if (row.deleted_at) { skipped++; continue; }
-          if (!row.site_name || !row.username || !row.encrypted_password) { skipped++; continue; }
+          if (!row.site_name || row.username === undefined || !row.encrypted_password) { skipped++; continue; }
+
+          // Check if this exact entry already exists to avoid duplicates
+          const exists = currentVaults.some(v => v.site_name === row.site_name && v.username === row.username && v.encrypted_password === row.encrypted_password);
+          if (exists) { skipped++; continue; }
 
           let finalEncryptedPassword = row.encrypted_password;
 

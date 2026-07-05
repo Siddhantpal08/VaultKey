@@ -328,7 +328,7 @@ const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 120,
+    bottom: 24,
     right: 20,
     width: 56,
     height: 56,

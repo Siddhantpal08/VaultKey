@@ -57,7 +57,7 @@ import {
 // Current app version — keep in sync with app.json and package.json
 const CURRENT_VERSION = "1.0.3";
 // Version manifest URL — update this whenever a new APK is released
-const VERSION_MANIFEST_URL = "https://crevio.vercel.app/api/vaultkey-version";
+const VERSION_MANIFEST_URL = "https://vault-key-app.vercel.app/version.json";
 
 
 type SettingsScreenProps = StackScreenProps<RootStackParamList, "Settings">;

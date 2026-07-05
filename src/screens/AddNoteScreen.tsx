@@ -14,13 +14,16 @@ import * as FileSystem from "expo-file-system";
 import { insertVault } from "../database/db";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 import { encryptWithSession, hasSessionKey } from "../security/crypto";
-import { Colors } from "../theme/colors";
+import { ThemeColors } from "../theme/colors";
+import { useTheme, useStyles } from "../theme/ThemeContext";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
 
 type AddNoteScreenProps = StackScreenProps<RootStackParamList, "AddNote">;
 
 export default function AddNoteScreen({ navigation, route }: AddNoteScreenProps): React.JSX.Element {
+  const { colors: Colors } = useTheme();
+  const styles = useStyles(createStyles);
   const initialTitle = route.params?.initialTitle || "";
   const initialContent = route.params?.initialContent || "";
   const isFile = route.params?.isFile || false;
@@ -156,7 +159,7 @@ export default function AddNoteScreen({ navigation, route }: AddNoteScreenProps)
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { paddingHorizontal: 16, paddingBottom: 28, paddingTop: 6 },
   topBar: { marginBottom: 8 },
