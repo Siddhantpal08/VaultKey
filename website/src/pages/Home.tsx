@@ -49,8 +49,8 @@ function Home() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
       {/* Background gradients */}
-      <div className="absolute top-[-25%] left-[-20%] w-[80%] h-[80%] bg-gradient-to-br from-indigo-900/20 via-blue-900/10 to-transparent blur-[200px] rounded-full pointer-events-none animate-pulse-glow" />
-      <div className="absolute bottom-[-15%] right-[-10%] w-[60%] h-[60%] bg-accent/5 blur-[180px] rounded-full pointer-events-none" />
+      <div className="absolute top-[-15%] left-[-15%] w-[75%] h-[75%] bg-primary/25 blur-[160px] rounded-full pointer-events-none animate-pulse-glow" />
+      <div className="absolute bottom-[-15%] right-[-15%] w-[75%] h-[75%] bg-accent/15 blur-[160px] rounded-full pointer-events-none" />
 
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-6 flex justify-between items-center relative z-10">
@@ -65,7 +65,21 @@ function Home() {
       </nav>
 
       {/* Hero Section */}
-      <header className="container mx-auto px-6 pt-20 pb-32 flex flex-col items-center text-center relative z-10 mt-10">
+      <header className="container mx-auto px-6 pt-16 pb-32 flex flex-col items-center text-center relative z-10 mt-6">
+        {/* Interactive 3D Spinning Security Element */}
+        <div className="relative w-40 h-40 mb-10 [perspective:1000px]">
+          <div className="w-full h-full relative [transform-style:preserve-3d] animate-spin-3d">
+            {/* Front Side: Shield */}
+            <div className="absolute inset-0 bg-primary/20 backdrop-blur-md rounded-3xl border border-primary/40 flex items-center justify-center [backface-visibility:hidden]">
+              <Shield className="w-20 h-20 text-primary drop-shadow-[0_0_15px_rgba(91,141,239,0.5)]" />
+            </div>
+            {/* Back Side: Key */}
+            <div className="absolute inset-0 bg-accent/20 backdrop-blur-md rounded-3xl border border-accent/40 flex items-center justify-center [backface-visibility:hidden] [transform:rotateY(180deg)]">
+              <Key className="w-20 h-20 text-accent drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
+            </div>
+          </div>
+        </div>
+
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-sm font-medium text-primary mb-8 animate-fade-in-up border border-primary/30 bg-primary/10">
           <Lock className="w-4 h-4" /> Complete Trust in VaultKey & Fully Protected
         </div>
@@ -92,11 +106,6 @@ function Home() {
               <GitBranch className="w-5 h-5" />
               View Source
             </a>
-          </div>
-
-          <div className="hidden md:flex flex-col items-center gap-2 bg-surface p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://vault-key-app.vercel.app/VaultKey.apk&bgcolor=060B17&color=ffffff" alt="Download QR" className="w-24 h-24 rounded-lg" />
-            <span className="text-xs font-semibold text-slate-400">Scan to Download</span>
           </div>
         </div>
         
@@ -231,7 +240,7 @@ function Home() {
               Scan this QR code with your phone's camera to download and install VaultKey directly on your Android device.
             </p>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 w-fit mx-auto mb-6 shadow-inner animate-float">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 w-fit mx-auto mb-6 shadow-inner">
               <img 
                 src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://vault-key-app.vercel.app/VaultKey.apk&bgcolor=060B17&color=ffffff" 
                 alt="VaultKey Download QR" 

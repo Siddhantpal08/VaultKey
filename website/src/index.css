@@ -32,9 +32,19 @@
 }
 
 .animate-pulse-glow {
-  animation: pulse-glow 8s ease-in-out infinite;
+  animation: pulse-glow 6s ease-in-out infinite;
 }
 
 .animate-slide-in {
   animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes spin-3d {
+  0% { transform: rotateY(0deg) rotateX(12deg); }
+  50% { transform: rotateY(180deg) rotateX(-12deg); }
+  100% { transform: rotateY(360deg) rotateX(12deg); }
+}
+
+.animate-spin-3d {
+  animation: spin-3d 10s ease-in-out infinite;
 }
