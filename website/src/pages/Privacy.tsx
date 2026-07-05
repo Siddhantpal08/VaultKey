@@ -2,51 +2,58 @@
 
 export default function Privacy() {
   return (
-    <div className="container mx-auto px-6 py-24 relative z-10 max-w-4xl min-h-screen">
-      <div className="glass-panel p-10 md:p-16">
-        <h1 className="text-4xl font-bold text-white mb-8">Privacy Policy</h1>
-        <p className="text-slate-400 mb-6 text-sm">Last Updated: July 5, 2026</p>
-        
-        <div className="space-y-6 text-slate-300 leading-relaxed">
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">The Short Version</h2>
-            <p className="text-xl font-medium text-primary">VaultKey does not collect, store, or transmit any of your personal data.</p>
-          </section>
+    <div className="flex-1 flex flex-col pt-32 pb-24 noise-overlay">
+      <div className="container mx-auto px-6 max-w-4xl relative z-10">
+        <div className="glass-strong p-10 md:p-16 rounded-3xl">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 font-outfit">Privacy Policy</h1>
+          <p className="text-slate-400 mb-10">Last Updated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">1. Data Collection & Storage</h2>
-            <p>VaultKey is a 100% offline application. We do not have servers, databases, or analytics engines connected to the app. All of your data (passwords, secure notes, TOTP secrets, settings, and master password) is stored locally on your device.</p>
-            <ul className="list-disc pl-6 space-y-2 mt-2">
-              <li>We do not collect usage statistics.</li>
-              <li>We do not use tracking cookies or SDKs.</li>
-              <li>We do not transmit crash reports.</li>
-            </ul>
-          </section>
+          <div className="space-y-10 text-slate-300 leading-relaxed">
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4 font-outfit">1. The "Zero Data" Philosophy</h2>
+              <p>
+                VaultKey is designed from the ground up as an offline-first, local-only application. 
+                We believe that the only way to truly secure your data is to never have access to it. 
+                Therefore, <strong>VaultKey collects absolutely no personal information, telemetry, analytics, or crash reports.</strong>
+              </p>
+            </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">2. Encryption</h2>
-            <p>Your data is encrypted using AES-256-GCM before it is written to your device's storage. The encryption key is derived from your Master Password using PBKDF2. Because your Master Password never leaves your device and is not stored anywhere, we have absolutely no way to access or decrypt your data.</p>
-          </section>
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4 font-outfit">2. Data Storage & Encryption</h2>
+              <p>
+                All data entered into VaultKey—including passwords, usernames, secure notes, and TOTP secrets—is encrypted locally on your device using military-grade AES-256 encryption. The encryption key is derived dynamically from your Master Password using PBKDF2.
+              </p>
+              <ul className="list-disc pl-6 mt-4 space-y-2">
+                <li>Your Master Password is never saved to the device storage in plaintext.</li>
+                <li>Your Master Password never leaves your device.</li>
+                <li>Without your Master Password, your encrypted vault database is mathematically unreadable.</li>
+              </ul>
+            </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">3. Backups</h2>
-            <p>If you choose to use the Auto-Backup feature, the app creates a fully encrypted `.pnb` file and saves it to a local folder on your device that you select. This file remains on your device (or wherever you choose to sync it personally, like your own Google Drive). We do not have access to these backups.</p>
-          </section>
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4 font-outfit">3. Network Access & Permissions</h2>
+              <p>
+                VaultKey does not contain any code to transmit data to the internet. The only network request made by the application is an optional check to a static JSON file on our GitHub repository to notify you if a newer version of the APK is available. This check transmits no identifying information.
+              </p>
+              <p className="mt-4">
+                The app requests camera permissions strictly for scanning local TOTP (Time-based One-Time Password) QR codes. These images are processed locally and never transmitted.
+              </p>
+            </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">4. Camera Permissions</h2>
-            <p>The app requests Camera permissions strictly for scanning QR codes to set up 2FA (TOTP). The QR code processing happens entirely offline on your device, and no image data is saved or transmitted.</p>
-          </section>
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4 font-outfit">4. Backups (.pnb files)</h2>
+              <p>
+                If you choose to use the automated or manual backup features, VaultKey will generate a `.pnb` file on your device's local storage. This file contains your fully encrypted database. It is your responsibility to secure this file. We cannot recover your data if you lose your device and do not have a backup, nor can we decrypt your backup if you forget your Master Password.
+              </p>
+            </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">5. Updates</h2>
-            <p>The app may periodically check our static website (this site) to see if a new APK version is available. This is a simple HTTP GET request that does not include any of your personal data.</p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-3">6. Changes to This Policy</h2>
-            <p>Because VaultKey is fundamentally offline and serverless, this Privacy Policy is unlikely to change significantly. However, if we do make updates, they will be posted here.</p>
-          </section>
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4 font-outfit">5. Contact</h2>
+              <p>
+                If you have any questions about this Privacy Policy or the security architecture of VaultKey, you can inspect the open-source codebase on GitHub or contact the developer at <a href="mailto:siddhant.pal.work@gmail.com" className="text-primary hover:underline">siddhant.pal.work@gmail.com</a>.
+              </p>
+            </section>
+          </div>
         </div>
       </div>
     </div>
