@@ -71,7 +71,17 @@ export default function LockScreen({ navigation }: LockScreenProps): React.JSX.E
   }, [pulseAnim]);
 
   const checkBiometricSupport = React.useCallback(async (): Promise<void> => {
+    // First-launch check: redirect to onboarding if never completed
+    const onboardingDone = await getSetting("onboarding_completed");
+    const masterMeta = await getSetting("master_password_meta");
+    if (!onboardingDone && !masterMeta) {
+      // Fresh install — show the onboarding guide before anything else
+      navigation.replace("Onboarding");
+      return;
+    }
+
     const biometricEnabledSetting = await getSetting("biometrics_enabled");
+
     const biometricEnabled = biometricEnabledSetting !== "false";
     const maxAttemptsSetting = Number((await getSetting("max_failed_attempts")) ?? String(MAX_ATTEMPTS));
     const lockoutSetting = Number((await getSetting("lockout_minutes")) ?? "10");

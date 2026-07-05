@@ -213,9 +213,9 @@ export default function AuthenticatorScreen({ navigation }: AuthenticatorScreenP
       <BottomTabBar
         activeTab="Auth"
         onTabPress={(tab) => {
-          if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Notes") navigation.navigate("Notes");
-          else if (tab === "Generator") navigation.navigate("Generator");
+          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
+          else if (tab === "Notes") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Notes" }] });
+          else if (tab === "Generator") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Generator" }] });
         }}
       />
 

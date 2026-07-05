@@ -47,7 +47,10 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [sortMode, setSortMode] = React.useState<SortMode>("recent");
   const [showAutoBackupPrompt, setShowAutoBackupPrompt] = React.useState<boolean>(false);
+  // Guard: only show the backup prompt once per app session (not on every screen focus)
+  const hasCheckedBackupPrompt = React.useRef(false);
   const toast = useToast();
+
 
   const loadVaults = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -60,6 +63,10 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
     React.useCallback(() => {
       let mounted = true;
       const checkPrompt = async () => {
+        // Only check once per session AND not while the PIN setup modal is still active
+        if (hasCheckedBackupPrompt.current) return;
+        if (showPINSetup) return;
+        hasCheckedBackupPrompt.current = true;
         try {
           const prompted = await getSetting("auto_backup_prompted_v2");
           const autoBackupDir = await getSetting("auto_backup_uri");
@@ -72,8 +79,9 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
       };
       void checkPrompt();
       return () => { mounted = false; };
-    }, [navigation])
+    }, [showPINSetup])
   );
+
 
   useFocusEffect(
     React.useCallback(() => {
@@ -357,7 +365,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
       <Modal
         visible={showAutoBackupPrompt}
         transparent
-        animationType="fade"
+        animationType="none"
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -380,7 +388,8 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
               style={styles.cancelButton}
               onPress={() => {
                 setShowAutoBackupPrompt(false);
-                // "Not Right Now" only dismisses for the current session
+                // Permanently mark as seen so it doesn't re-appear on next launch
+                void upsertSetting("auto_backup_prompted_v2", "true");
               }}
             >
               <Text style={styles.cancelButtonText}>Not Right Now</Text>
@@ -390,6 +399,7 @@ export default function HomeScreen({ navigation, route }: HomeScreenProps): Reac
               onPress={() => {
                 setShowAutoBackupPrompt(false);
                 void upsertSetting("auto_backup_prompted_v2", "true");
+
               }}
             >
               <Text style={[styles.cancelButtonText, { fontSize: 12, opacity: 0.7 }]}>Don't Ask Again</Text>

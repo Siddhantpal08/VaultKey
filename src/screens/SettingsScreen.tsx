@@ -46,13 +46,19 @@ import { useStyles, useTheme, type ThemePreference } from "../theme/ThemeContext
 import { BottomTabBar } from "../components/BottomTabBar";
 import { useToast } from "../components/Toast";
 import { Ionicons } from "@expo/vector-icons";
-import * as Updates from "expo-updates";
+import * as Linking from "expo-linking";
 import {
   getAutoBackupDirectory,
   requestAutoBackupDirectory,
   disableAutoBackup,
   triggerAutoBackup,
 } from "../database/backup";
+
+// Current app version — keep in sync with app.json and package.json
+const CURRENT_VERSION = "1.0.3";
+// Version manifest URL — update this whenever a new APK is released
+const VERSION_MANIFEST_URL = "https://crevio.vercel.app/api/vaultkey-version";
+
 
 type SettingsScreenProps = StackScreenProps<RootStackParamList, "Settings">;
 
@@ -560,33 +566,70 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
 
   const checkForUpdates = async (): Promise<void> => {
     try {
-      if (__DEV__) {
-        toast.show("Updates cannot be checked in development mode.", "info");
-        return;
-      }
       setCheckingUpdate(true);
       toast.show("Checking for updates...", "info");
-      const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
-        toast.show("Update found! Downloading...", "info");
-        await Updates.fetchUpdateAsync();
-        Alert.alert(
-          "Update Downloaded",
-          "A new update has been downloaded and is ready to apply. Restart now?",
-          [
-            { text: "Later", style: "cancel" },
-            { text: "Restart", style: "destructive", onPress: () => void Updates.reloadAsync() },
-          ]
-        );
-      } else {
-        toast.show("App is up to date. If expecting major changes, check website for new APK.", "success");
+
+      // Fetch the version manifest from our server
+      const response = await fetch(VERSION_MANIFEST_URL, {
+        method: "GET",
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
-    } catch (e: any) {
-      toast.show(`Update check failed: ${e.message || "Unknown error"}`, "error");
+
+      const manifest = await response.json() as {
+        version: string;
+        apkUrl: string;
+        releaseNotes?: string;
+      };
+
+      const latestVersion = manifest.version?.trim();
+      const apkUrl = manifest.apkUrl?.trim();
+
+      if (!latestVersion || !apkUrl) {
+        throw new Error("Invalid version manifest");
+      }
+
+      // Compare semver: if latest > current, prompt to download
+      if (latestVersion === CURRENT_VERSION) {
+        toast.show(`VaultKey ${CURRENT_VERSION} is up to date. ✓`, "success");
+        return;
+      }
+
+      // Newer version available — prompt to download & install
+      Alert.alert(
+        "🎉 Update Available!",
+        `VaultKey ${latestVersion} is available (you have ${CURRENT_VERSION}).${
+          manifest.releaseNotes ? `\n\n${manifest.releaseNotes}` : ""
+        }\n\nTap Download to get the new APK. Android will install it automatically once downloaded.`,
+        [
+          { text: "Later", style: "cancel" },
+          {
+            text: "Download & Install",
+            onPress: async () => {
+              try {
+                await Linking.openURL(apkUrl);
+              } catch {
+                toast.show("Could not open download link. Please visit our website.", "error");
+              }
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      // Network unavailable or manifest fetch failed
+      toast.show(
+        "Could not check for updates. Make sure you have internet access.",
+        "error"
+      );
     } finally {
       setCheckingUpdate(false);
     }
   };
+
+
 
   if (!isReady) {
     return (

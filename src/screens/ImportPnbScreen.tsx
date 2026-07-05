@@ -14,9 +14,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore expo-file-system legacy typed exports
 import { readAsStringAsync } from "expo-file-system/legacy";
-import { clearSettingsExcept, clearVaults, getVaults, insertVault, upsertSetting } from "../database/db";
+import { clearSettingsExcept, clearVaults, insertVault, upsertSetting } from "../database/db";
+
 import type { RootStackParamList } from "../navigation/AppNavigator";
-import { createMasterMeta, decryptWithSession, setSessionFromMaster } from "../security/crypto";
+import {
+  decryptStandalone,
+  decryptWithSession,
+  encryptWithSession,
+  hasSessionKey,
+} from "../security/crypto";
+
+
 import { ThemeColors } from "../theme/colors";
 import { useStyles, useTheme } from "../theme/ThemeContext";
 import { useToast } from "../components/Toast";
@@ -33,6 +41,8 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
   const [passwordInput, setPasswordInput] = useState("");
   const [v2Data, setV2Data] = useState<{ master_meta: string; data: string } | null>(null);
   const toast = useToast();
+
+
 
   const onImport = async () => {
     try {
@@ -81,27 +91,38 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
     if (!v2Data || !passwordInput) return;
     setIsImporting(true);
     try {
-      const { decryptStandalone } = require("../security/crypto");
       const decryptedRaw = await decryptStandalone(v2Data.data, passwordInput, v2Data.master_meta);
-      processDecrypted(decryptedRaw);
+      // Pass backup credentials so processImport can re-encrypt each entry with the current session key
+      processDecrypted(decryptedRaw, true, passwordInput, v2Data.master_meta);
     } catch (e) {
       toast.show("Incorrect password for this backup.", "error");
       setIsImporting(false);
     }
   };
 
-  const processDecrypted = (decryptedRaw: string) => {
+
+  const processDecrypted = (
+    decryptedRaw: string,
+    reEncrypt = false,
+    oldPassword = "",
+    oldMeta = "",
+  ) => {
     try {
       const parsed = JSON.parse(decryptedRaw);
       if (parsed.schema !== "vaultkey-export-v1") throw new Error("Invalid schema");
       
+      // Count non-deleted entries only
+      const visibleEntries = (parsed.vaults ?? []).filter(
+        (v: any) => !v.deleted_at
+      );
+
       Alert.alert(
         "Import Encrypted Backup",
-        `Found ${parsed.vaults?.length || 0} entries. Merge with current vault or replace everything?`,
+        `Found ${visibleEntries.length} entries. Merge with current vault or replace everything?`,
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Merge", onPress: () => processImport(parsed, "merge") },
-          { text: "Replace All", style: "destructive", onPress: () => processImport(parsed, "replace") }
+          { text: "Cancel", style: "cancel", onPress: () => setIsImporting(false) },
+          { text: "Merge", onPress: () => void processImport(parsed, "merge", reEncrypt, oldPassword, oldMeta) },
+          { text: "Replace All", style: "destructive", onPress: () => void processImport(parsed, "replace", reEncrypt, oldPassword, oldMeta) }
         ]
       );
     } catch (e) {
@@ -110,7 +131,14 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
     }
   };
 
-  const processImport = async (parsed: any, mode: "merge" | "replace") => {
+
+  const processImport = async (
+    parsed: any,
+    mode: "merge" | "replace",
+    reEncrypt = false,
+    oldPassword = "",
+    oldMeta = "",
+  ) => {
     try {
       if (mode === "replace") {
         await clearVaults();
@@ -125,14 +153,33 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
       }
 
       let inserted = 0;
+      let skipped = 0;
       if (parsed.vaults) {
         for (const row of parsed.vaults) {
-          if (!row.site_name || !row.username || !row.encrypted_password) continue;
+          // Skip deleted entries and entries without required fields
+          if (row.deleted_at) { skipped++; continue; }
+          if (!row.site_name || !row.username || !row.encrypted_password) { skipped++; continue; }
+
+          let finalEncryptedPassword = row.encrypted_password;
+
+          if (reEncrypt && oldPassword && oldMeta && hasSessionKey()) {
+            // The entry was encrypted with the backup's master key.
+            // Decrypt it with the old key, then re-encrypt with the current session key.
+            try {
+              const plainText = await decryptStandalone(row.encrypted_password, oldPassword, oldMeta);
+              finalEncryptedPassword = encryptWithSession(plainText);
+            } catch {
+              // If individual entry decryption fails, skip it
+              skipped++;
+              continue;
+            }
+          }
+
           await insertVault({
             siteName: row.site_name,
             url: row.url,
             username: row.username,
-            encryptedPassword: row.encrypted_password,
+            encryptedPassword: finalEncryptedPassword,
             category: row.category,
             notes: row.notes,
             tags: row.tags,
@@ -145,8 +192,10 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
       }
 
       Alert.alert(
-        "Import Complete", 
-        `Successfully imported ${inserted} entries.`,
+        "Import Complete",
+        skipped > 0
+          ? `Successfully imported ${inserted} entries (${skipped} skipped).`
+          : `Successfully imported ${inserted} entries.`,
         [{ text: "OK", onPress: () => navigation.navigate("Home") }]
       );
     } catch {
@@ -155,6 +204,7 @@ export default function ImportPnbScreen({ navigation, route }: ImportPnbScreenPr
       setIsImporting(false);
     }
   };
+
 
   return (
     <SafeAreaView style={styles.safeArea}>

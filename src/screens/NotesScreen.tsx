@@ -127,9 +127,9 @@ export default function NotesScreen({ navigation }: NotesScreenProps): React.JSX
       <BottomTabBar
         activeTab="Notes"
         onTabPress={(tab) => {
-          if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Generator") navigation.navigate("Generator");
-          else if (tab === "Auth") navigation.navigate("Authenticator");
+          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
+          else if (tab === "Generator") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Generator" }] });
+          else if (tab === "Auth") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Authenticator" }] });
         }}
       />
 

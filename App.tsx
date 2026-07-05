@@ -34,34 +34,36 @@ export default function App(): React.JSX.Element {
     };
 
     const checkUpdates = async () => {
+      // Updates are only available in EAS-managed OTA builds.
+      // In dev mode or bare APK builds this call throws — swallow it silently.
+      if (__DEV__) return;
       try {
-        if (!__DEV__) {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            Alert.alert(
-              "Update Available",
-              "A new version of VaultKey is available. Do you want to download and install it now?",
-              [
-                { text: "Later", style: "cancel" },
-                {
-                  text: "Update",
-                  onPress: async () => {
-                    try {
-                      await Updates.fetchUpdateAsync();
-                      await Updates.reloadAsync();
-                    } catch (e) {
-                      Alert.alert("Update Failed", "Could not download the update. Please check the website if this is a major release.");
-                    }
-                  },
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          Alert.alert(
+            "Update Available",
+            "A new version of VaultKey is available. Do you want to download and install it now?",
+            [
+              { text: "Later", style: "cancel" },
+              {
+                text: "Update",
+                onPress: async () => {
+                  try {
+                    await Updates.fetchUpdateAsync();
+                    await Updates.reloadAsync();
+                  } catch {
+                    Alert.alert("Update Failed", "Could not download the update. Please check the website if this is a major release.");
+                  }
                 },
-              ]
-            );
-          }
+              },
+            ]
+          );
         }
-      } catch (e) {
-        // Ignore errors in development or if Updates API is unavailable
+      } catch {
+        // Silently ignore — not an OTA-enabled build
       }
     };
+
 
     void checkUpdates();
     void bootstrap();

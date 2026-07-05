@@ -53,19 +53,22 @@ export async function triggerAutoBackup(): Promise<boolean> {
       data: encrypted,
     }, null, 2);
 
-    const fileName = "VaultKey_AutoBackup.pnb";
     const fileUriKey = "auto_backup_file_uri";
     const savedFileUri: string | null = await db.getSetting(fileUriKey);
 
+    // Try to overwrite the existing file first to avoid accumulating duplicate files.
+    // If that fails (e.g., file was manually deleted), create a new one.
     if (savedFileUri) {
       try {
-        await StorageAccessFramework.deleteAsync(savedFileUri);
+        await writeAsStringAsync(savedFileUri, v2Export, { encoding: "utf8" });
+        return true;
       } catch {
-        // ignore if already deleted
+        // Stored URI is stale — fall through to create a new file
       }
     }
 
-    // Create a brand-new file and save the new URI
+    // Create a brand-new file and save the URI for future overwrites
+    const fileName = "VaultKey_AutoBackup.pnb";
     const newFileUri = await StorageAccessFramework.createFileAsync(
       dirUri,
       fileName,
@@ -80,3 +83,4 @@ export async function triggerAutoBackup(): Promise<boolean> {
     return false;
   }
 }
+

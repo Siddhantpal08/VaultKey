@@ -69,6 +69,7 @@ export default function PasswordDetailScreen({
   const load = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
     if (!hasSessionKey()) {
+      setIsLoading(false);
       Alert.alert("Session locked", "Please verify your master password.", [
         { text: "OK", onPress: () => navigation.replace("MasterPassword") },
       ]);
@@ -76,6 +77,7 @@ export default function PasswordDetailScreen({
     }
     const row = await getVaultById(route.params.id);
     if (!row) {
+      setIsLoading(false);
       Alert.alert("Not found", "Password entry no longer exists.", [
         { text: "OK", onPress: () => navigation.replace("Home") },
       ]);

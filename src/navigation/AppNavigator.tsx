@@ -1,7 +1,7 @@
 import React from "react";
-import { AppState, Platform, type AppStateStatus } from "react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
-import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
+import { createStackNavigator } from "@react-navigation/stack";
 import LockScreen from "../screens/LockScreen";
 import MasterPasswordScreen from "../screens/MasterPasswordScreen";
 import HomeScreen from "../screens/HomeScreen";
@@ -19,6 +19,8 @@ import TrashScreen from "../screens/TrashScreen";
 import AuditScreen from "../screens/AuditScreen";
 import ImportPnbScreen from "../screens/ImportPnbScreen";
 import QRScanScreen from "../screens/QRScanScreen";
+import OnboardingScreen from "../screens/OnboardingScreen";
+
 import { getSetting } from "../database/db";
 import { clearSessionKey } from "../security/crypto";
 import { useShareIntent } from "expo-share-intent";
@@ -27,6 +29,7 @@ import { useTheme } from "../theme/ThemeContext";
 
 export type RootStackParamList = {
   Lock: undefined;
+  Onboarding: undefined;
   MasterPassword: undefined;
   Home: { showPINSetup?: boolean } | undefined;
   AddPassword: { prefillUrl?: string; prefillSiteName?: string; prefillTotpSecret?: string } | undefined;
@@ -44,6 +47,7 @@ export type RootStackParamList = {
   ImportPnb: { filePath: string };
   QRScan: undefined;
 };
+
 
 const Stack = createStackNavigator<RootStackParamList>();
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -168,12 +172,13 @@ export default function AppNavigator(): React.JSX.Element {
         screenOptions={{
           headerShown: false,
           cardStyle: { backgroundColor: Colors.bg },
-          cardStyleInterpolator: (Platform.OS === "android" && Number(Platform.Version) < 28)
-            ? CardStyleInterpolators.forFadeFromBottomAndroid
-            : CardStyleInterpolators.forHorizontalIOS,
+          // Animations are disabled globally to prevent the Lock screen from
+          // briefly flashing through during screen transitions.
+          animationEnabled: false,
         }}
       >
         <Stack.Screen name="Lock" component={LockScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="MasterPassword" component={MasterPasswordScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Favourites" component={FavouritesScreen} />

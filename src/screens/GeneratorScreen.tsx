@@ -200,9 +200,9 @@ export default function GeneratorScreen({ navigation }: GeneratorScreenProps): R
       <BottomTabBar
         activeTab="Generator"
         onTabPress={(tab) => {
-          if (tab === "Vault") navigation.navigate("Home");
-          else if (tab === "Notes") navigation.navigate("Notes");
-          else if (tab === "Auth") navigation.navigate("Authenticator");
+          if (tab === "Vault") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Home" }] });
+          else if (tab === "Notes") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Notes" }] });
+          else if (tab === "Auth") navigation.reset({ index: 0, routes: [{ name: "Lock" }, { name: "Authenticator" }] });
         }}
       />
     </SafeAreaView>

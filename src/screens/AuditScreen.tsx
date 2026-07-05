@@ -24,6 +24,18 @@ type AuditIssue = {
   detail: string;
 };
 
+function computeLiveStrength(password: string): number {
+  if (!password) return 0;
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  return Math.min(5, score);
+}
+
+
 export default function AuditScreen({ navigation }: AuditScreenProps): React.JSX.Element {
   const [issues, setIssues] = React.useState<AuditIssue[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -48,12 +60,15 @@ export default function AuditScreen({ navigation }: AuditScreenProps): React.JSX
       try {
         const plain = decryptWithSession(row.encrypted_password);
         
-        // Check for weak password
-        if (plain.length < 8 || (row.strength_score !== null && row.strength_score < 2)) {
+        // Compute strength live — never trust the potentially stale DB value
+        const liveScore = computeLiveStrength(plain);
+        
+        // Flag as weak if short OR score is 2 or below ("password123" scores 2)
+        if (plain.length < 8 || liveScore <= 2) {
           foundIssues.push({
             type: "weak",
             vault: row,
-            detail: "Password is too weak or short.",
+            detail: plain.length < 8 ? "Password is too short (< 8 chars)." : "Password is too weak.",
           });
         }
 
@@ -62,12 +77,12 @@ export default function AuditScreen({ navigation }: AuditScreenProps): React.JSX
         existing.push(row);
         passwordMap.set(plain, existing);
       } catch (e) {
-        // failed to decrypt
+        // failed to decrypt — skip silently
       }
     }
 
     // Process duplicates
-    for (const [plain, items] of passwordMap.entries()) {
+    for (const [, items] of passwordMap.entries()) {
       if (items.length > 1) {
         for (const item of items) {
           foundIssues.push({
@@ -88,6 +103,7 @@ export default function AuditScreen({ navigation }: AuditScreenProps): React.JSX
     setIssues(foundIssues);
     setIsLoading(false);
   }, []);
+
 
   useFocusEffect(
     React.useCallback(() => {
