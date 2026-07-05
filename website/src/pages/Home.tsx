@@ -1,10 +1,12 @@
 import React from 'react';
-import { Shield, Key, Download, Coffee, GitBranch, Mail, Smartphone, Code, Lock, SmartphoneNfc, FileText, CloudUpload } from 'lucide-react';
+import { Shield, Key, Download, Coffee, GitBranch, Mail, Smartphone, Code, Lock, SmartphoneNfc, FileText, CloudUpload, X } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [showModal, setShowModal] = React.useState(false);
+  const [showToast, setShowToast] = React.useState(false);
 
   // Smooth scroll handler for anchor links
   const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
@@ -18,16 +20,42 @@ function Home() {
       document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  const handleDownloadClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const isDesktop = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isDesktop) {
+      setShowModal(true);
+    } else {
+      triggerDownload();
+    }
+  };
+
+  const triggerDownload = () => {
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 4500);
+
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = '/VaultKey.apk';
+    link.download = 'VaultKey.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col">
+    <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
       {/* Background gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-primary/30 blur-[150px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-accent/20 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-[-25%] left-[-20%] w-[80%] h-[80%] bg-gradient-to-br from-indigo-900/20 via-blue-900/10 to-transparent blur-[200px] rounded-full pointer-events-none animate-pulse-glow" />
+      <div className="absolute bottom-[-15%] right-[-10%] w-[60%] h-[60%] bg-accent/5 blur-[180px] rounded-full pointer-events-none" />
 
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-6 flex justify-between items-center relative z-10">
-        <Link to="/" className="flex items-center gap-3 text-2xl font-bold tracking-tight text-white">
-          <img src="/logo.png" alt="VaultKey Logo" className="w-12 h-12 object-contain" />
+        <Link to="/" className="flex items-center gap-3 text-2xl font-bold tracking-tight text-white hover:opacity-90 transition-opacity">
+          <img src="/logo.png" alt="VaultKey Logo" className="w-12 h-12 object-contain rounded-[22%] overflow-hidden" />
           VaultKey
         </Link>
         <div className="flex gap-4">
@@ -56,18 +84,18 @@ function Home() {
 
         <div className="flex flex-col md:flex-row items-center gap-8 w-full justify-center">
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <a href="/VaultKey.apk" download className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(91,141,239,0.3)] hover:shadow-[0_0_30px_rgba(91,141,239,0.5)] hover:-translate-y-1">
+            <button onClick={handleDownloadClick} className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(91,141,239,0.3)] hover:shadow-[0_0_30px_rgba(91,141,239,0.5)] hover:-translate-y-1">
               <Download className="w-5 h-5" />
               Download APK
-            </a>
-            <a href="https://github.com/Siddhantpal08/VaultKey" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-surface hover:bg-slate-800 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all border border-slate-700/50 hover:border-slate-600">
+            </button>
+            <a href="https://github.com/Siddhantpal08/VaultKey" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-surface hover:bg-slate-800 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all border border-slate-700/50 hover:border-slate-600 hover:-translate-y-1">
               <GitBranch className="w-5 h-5" />
               View Source
             </a>
           </div>
 
-          <div className="hidden md:flex flex-col items-center gap-2 bg-surface p-3 rounded-xl border border-slate-800">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://vaultkey.vercel.app/VaultKey.apk&bgcolor=060B17&color=ffffff" alt="Download QR" className="w-24 h-24 rounded-lg" />
+          <div className="hidden md:flex flex-col items-center gap-2 bg-surface p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://vault-key-app.vercel.app/VaultKey.apk&bgcolor=060B17&color=ffffff" alt="Download QR" className="w-24 h-24 rounded-lg" />
             <span className="text-xs font-semibold text-slate-400">Scan to Download</span>
           </div>
         </div>
@@ -169,6 +197,63 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* Download Alert Toast */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 z-50 glass-panel bg-slate-900 border-primary/50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-in max-w-sm">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+            <Download className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm">Download starting...</p>
+            <p className="text-slate-400 text-xs mt-0.5">Your VaultKey APK download will start in a few seconds.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop QR Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="relative w-full max-w-md p-8 glass-panel bg-slate-900 border-slate-800 shadow-3xl text-center rounded-2xl">
+            <button 
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-850 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6 text-primary border border-primary/20">
+              <Smartphone className="w-8 h-8" />
+            </div>
+
+            <h3 className="text-2xl font-bold text-white mb-2">Install on Mobile</h3>
+            <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
+              Scan this QR code with your phone's camera to download and install VaultKey directly on your Android device.
+            </p>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 w-fit mx-auto mb-6 shadow-inner animate-float">
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://vault-key-app.vercel.app/VaultKey.apk&bgcolor=060B17&color=ffffff" 
+                alt="VaultKey Download QR" 
+                className="w-44 h-44 rounded-lg"
+              />
+            </div>
+
+            <div className="border-t border-slate-800/80 pt-6">
+              <p className="text-xs text-slate-500 mb-3">Or, download it to your computer anyway:</p>
+              <button 
+                onClick={() => {
+                  setShowModal(false);
+                  triggerDownload();
+                }}
+                className="text-primary hover:text-primary/80 font-bold text-sm transition-colors underline"
+              >
+                Download APK directly
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
