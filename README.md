@@ -1,124 +1,257 @@
-VaultKey: Complete Master Documentation
+<div align="center">
 
-This document serves as the absolute, start-to-finish master record of the entire VaultKey project. It covers the architecture, security model, database schema, user interface features, and the companion marketing website, detailing exactly how VaultKey was built to be a premium, secure, offline-first password manager.
-1. Project Overview & Philosophy
+<img src="./assets/icon.png" alt="VaultKey Logo" width="100" height="100" style="border-radius: 22%;" />
 
-VaultKey was engineered to solve a fundamental problem in modern password management: the reliance on cloud infrastructure. Cloud-based password managers are frequent targets for data breaches. VaultKey’s philosophy is Zero-Trust, 100% Offline.
+# VaultKey
 
-    No Network Calls: The mobile application contains absolutely no telemetry, cloud sync, or external API dependencies (except for an optional update check that simply reads a static JSON file).
-    Total Data Ownership: User data physically never leaves the device unless explicitly exported by the user as an encrypted .pnb backup.
-    Premium Aesthetics: Despite being a highly-secure offline utility, it boasts a modern, fluid, glassmorphic UI that matches the quality of enterprise-grade applications.
+**Zero-Trust. 100% Offline. Uncompromising Security.**
 
-2. Security Architecture
+A premium, open-source password manager for Android — built with React Native & Expo. Your data never leaves your device.
 
-The core of VaultKey is its robust cryptographic implementation, ensuring that even if a device is rooted or physically compromised, the SQLite database remains completely unreadable.
-2.1. Master Key Derivation
+[![Version](https://img.shields.io/badge/version-1.0.3-blue?style=flat-square)](./app.json)
+[![Platform](https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square&logo=android)](.)
+[![License](https://img.shields.io/badge/license-Private-red?style=flat-square)](.)
+[![Built With](https://img.shields.io/badge/built%20with-Expo%20%26%20React%20Native-blueviolet?style=flat-square&logo=expo)](https://expo.dev)
+[![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM-orange?style=flat-square)](.)
 
-    PBKDF2 Hashing: When the user creates a Master Password, a unique cryptographic salt (master_password_meta) is generated. The password and salt are run through PBKDF2 (Password-Based Key Derivation Function 2) to generate a robust AES-256 encryption key.
-    Session State: The derived key is never stored on disk. It is stored in a volatile JavaScript session variable (crypto.ts) during runtime and is wiped the moment the app is locked or closed.
+</div>
 
-2.2. Data Encryption
+---
 
-    AES-256-GCM: Every sensitive field—including username, encrypted_password, totp_secret, notes, and url—is encrypted in memory using the Session Key before being written to the SQLite database.
-    Zero-Knowledge DB: Looking directly at the SQLite database yields only base64-encoded encrypted strings. Even the database schema is abstracted so that an attacker cannot deduce what sites the user has stored.
+## 🔐 What is VaultKey?
 
-2.3. Biometrics & PIN Fallback
+VaultKey was engineered to solve a fundamental problem in modern password management: **the reliance on cloud infrastructure**. Cloud-based password managers are frequent targets for data breaches.
 
-    Quick Unlock: To prevent users from having to type a complex Master Password every time, the app supports a 4-digit PIN hash (stored locally) and Biometric Authentication (FaceID/Fingerprint). These mechanisms allow the app to securely retrieve the active session state without re-asking for the master password, provided the device has not been rebooted or the session hard-cleared.
+VaultKey's answer is simple — **your data never touches a server. Ever.**
 
-3. Database Architecture (expo-sqlite)
+| Principle | Description |
+|---|---|
+| 🚫 **No Network Calls** | Zero telemetry, zero cloud sync, zero external API dependencies |
+| 🔒 **Total Data Ownership** | Data never leaves the device unless you explicitly export an encrypted `.pnb` backup |
+| ✨ **Premium Aesthetics** | A modern, fluid, glassmorphic UI that rivals enterprise-grade applications |
 
-The application utilizes a local SQLite database with an abstracted, dynamic schema.
-3.1. Core Tables
+---
 
-    settings Table:
-        Stores master_password (hashed for verification).
-        Stores master_password_meta (the PBKDF2 salt).
-        Stores pin_hash, use_biometrics, auto_backup, and backup_uri.
-    vaults Table:
-        The primary storage table. It contains rows for Passwords, Secure Notes, and Authenticator entries.
-        Fields: id, site_name (plaintext, for searching/indexing), username, encrypted_password, totp_secret, url, notes, is_note, is_favorite, created_at, updated_at, deleted_at.
-        Note on Soft Deletes: When a user deletes an entry, deleted_at is populated. This allows for potential trash-recovery and ensures clean merge-handling during backup imports.
+## ✨ Features
 
-4. Core Application Features
-4.1. The Password Vault (Home)
+### 🗝️ Password Vault
+- Displays all credentials with a visual **Password Strength Ring** (Red → Yellow → Green → Blue)
+- Smart `SiteIcon` component: fetches real favicons for known domains, falls back to a generated initial
+- Sort, filter, search, and mark items as **favorites**
 
-    Displays all encrypted credentials.
-    Features an intelligent Password Strength Ring (Red, Yellow, Green, Blue) based on length and complexity.
-    Integrates a custom SiteIcon component that intelligently fetches favicons for known domains or falls back to a sleek generated initial.
-    Allows sorting, filtering, and marking specific items as favorites.
+### 📝 Secure Notes
+- Store freeform encrypted text — recovery phrases, banking PINs, private thoughts
+- Uses the same **AES-256-GCM** pipeline as password entries
 
-4.2. Secure Notes
+### 🔑 TOTP Authenticator (Built-in 2FA)
+- Fully native, **100% offline** Time-based One-Time Password engine
+- Scan QR codes via camera or enter a **Base32 secret key** manually
+- 30-second countdown timer with a visual progress bar that flashes red on expiry
 
-    A dedicated section for storing freeform encrypted text (recovery phrases, banking details, private thoughts).
-    Uses a markdown-friendly display structure and the same AES-256 encryption pipeline as passwords.
+### 🎲 Password Generator
+- Toggle **Uppercase, Lowercase, Numbers, Symbols** independently
+- Adjustable length slider
+- Powered by `expo-crypto` random bytes for cryptographically secure output
 
-4.3. TOTP Authenticator
+### 💾 Backup & Restore (`.pnb`)
+- Proprietary **Portable Network Backup** format with embedded PBKDF2 salt
+- **Auto-Backup** via Android's Storage Access Framework (SAF) — triggers on every vault change
+- **Smart Import/Merge** — skips duplicate entries, supports re-encryption across different master passwords
 
-    A fully native built-in 2FA Authenticator.
-    Users can scan a QR code (using expo-camera) or manually enter a Base32 secret key.
-    The app calculates Time-based One-Time Passwords completely offline, rendering a 30-second countdown timer and a progress bar that flashes red when expiration is imminent.
+---
 
-4.4. Password Generator
+## 🛡️ Security Architecture
 
-    A highly customizable offline engine.
-    Users can toggle Uppercase, Lowercase, Numbers, and Symbols, and adjust length via a slider.
-    Generates a cryptographically secure random string using expo-crypto's random bytes, ensuring it is safe for high-security environments.
+### Master Key Derivation
+```
+Master Password + Unique Salt ──► PBKDF2 ──► AES-256 Session Key (in-memory only)
+```
+- The derived key is **never stored to disk**. It lives in a volatile session variable and is wiped on lock or close.
 
-5. The Backup & Restoration Engine (.pnb)
+### Data Encryption
+- Every sensitive field (`username`, `password`, `totp_secret`, `notes`, `url`) is encrypted with **AES-256-GCM** *before* being written to SQLite.
+- The raw database contains only base64-encoded ciphertext — completely unreadable without the session key.
 
-Because VaultKey has no cloud sync, the backup engine is its lifeline against device loss.
-5.1. V2 JSON Architecture
+### Authentication Options
+| Method | Description |
+|---|---|
+| **Master Password** | Full PBKDF2-derived key authentication |
+| **4-Digit PIN** | Hashed PIN for quick daily access |
+| **Biometrics** | FaceID / Fingerprint — retrieves the session state without re-entering the master password |
 
-    Backups are serialized into a proprietary .pnb (Portable Network Backup) JSON format.
-    Crucial Innovation: The backup explicitly includes the master_meta salt.
-    Why? If a user switches to a new phone and installs VaultKey, their new phone generates a new salt. Without the original salt, their old Master Password would derive a completely different AES-256 key, permanently locking them out of their backup. By embedding the original salt into the .pnb, the app can successfully decrypt the backup as long as the user remembers their original Master Password.
+---
 
-5.2. Auto-Backup Flow
+## 🏗️ Tech Stack
 
-    Utilizes Android's Storage Access Framework (SAF).
-    The user is prompted to grant permission to a specific local folder.
-    Every time the user modifies the database (adds, edits, or deletes a vault), the app automatically generates a new .pnb file in the background.
-    Retention Polish: To prevent storage bloat, the app actively scans the folder and deletes previous VaultKey_AutoBackup files, ensuring only the single latest state is retained.
+| Layer | Technology |
+|---|---|
+| **Framework** | React Native 0.81 + Expo SDK 54 |
+| **Language** | TypeScript 5.9 |
+| **Navigation** | React Navigation v7 |
+| **Database** | `expo-sqlite` (local SQLite) |
+| **Cryptography** | `@noble/ciphers` (AES-256-GCM) + `@noble/hashes` (PBKDF2) |
+| **Biometrics** | `expo-local-authentication` |
+| **Camera / QR** | `expo-camera` |
+| **Secure Storage** | `expo-secure-store` |
+| **Build** | EAS Build (Expo Application Services) |
 
-5.3. Smart Import/Merge
+---
 
-    When importing a .pnb, the app analyzes the entries.
-    Merge Logic: It automatically skips entries that are identical to those currently in the database, preventing duplicate clutter. It accurately identifies entries with blank usernames (such as standard Notes) and successfully processes them without false-positive errors.
-    Re-Encryption: If the user imports a backup from an old master password into an app with a new master password, the engine decrypts the payload with the old key and instantly re-encrypts it with the active session key.
+## 🗄️ Database Schema
 
-6. UI/UX & Theming Engine
+### `settings` table
+Stores app-wide configuration.
 
-VaultKey was designed to feel like a flagship application.
-6.1. Dynamic Theming
+| Column | Description |
+|---|---|
+| `master_password` | Hashed master password (for verification) |
+| `master_password_meta` | PBKDF2 salt (critical for backup decryption) |
+| `pin_hash` | Hashed 4-digit PIN |
+| `use_biometrics` | Biometric unlock toggle |
+| `auto_backup` | Auto-backup enabled flag |
+| `backup_uri` | SAF URI for the auto-backup folder |
 
-    A custom ThemeContext provides live Light and Dark mode switching.
-    Uses a useStyles() hook architecture, allowing every single stylesheet to dynamically adapt to ThemeColors without requiring app restarts.
-    Dark Mode employs deep bg-background (#060B17) with glowing borders (bg-surface), while Light mode uses clean whites and soft grays.
+### `vaults` table
+Primary data store for all entry types (Passwords, Notes, Authenticators).
 
-6.2. Navigation & Layout
+| Column | Notes |
+|---|---|
+| `id` | Primary key |
+| `site_name` | Plaintext — used for search & indexing |
+| `username` | **Encrypted** |
+| `encrypted_password` | **Encrypted** |
+| `totp_secret` | **Encrypted** |
+| `notes` | **Encrypted** |
+| `url` | **Encrypted** |
+| `is_note` | Boolean flag |
+| `is_favorite` | Boolean flag |
+| `created_at` / `updated_at` | Timestamps |
+| `deleted_at` | Soft-delete (enables trash recovery & clean backup merges) |
 
-    Powered by React Navigation v7.
-    Features a custom Native Bottom Tab Bar (BottomTabBar.tsx) with modern, pill-shaped active-glow states.
-    Floating Action Buttons (FABs) are meticulously placed across screens to respect system safe-areas and tab bars.
-    Modals (such as PIN setup, entry deletion, and manual TOTP entry) are rendered as custom, glassmorphic React Native overlays rather than default OS alerts, ensuring brand consistency.
+---
 
-7. The Marketing Website (website/)
+## 💾 The `.pnb` Backup Format
 
-To distribute the app and build trust, a companion landing page was built using React, Vite, and Tailwind CSS.
-7.1. Visual Design
+Because VaultKey has no cloud sync, backups are your **lifeline against device loss**.
 
-    Dark Cyber Aesthetic: Deep space backgrounds accented with massive, multi-layered diffuse gradients (indigo and accent/blue).
-    CSS Animations: Features organic background breathing (animate-pulse-glow), floating elements (animate-float), and slide-in notifications.
-    3D Hero Element: At the top of the site sits a pure CSS 3D rotating card (using perspective and preserve-3d) that infinitely spins, showcasing a glowing security Shield on one side and an encryption Key on the other.
-    Refined Logo: The core logo is dynamically shaped with CSS (rounded-[22%] overflow-hidden) to remove harsh white artifacts, maintaining a perfect premium curve.
+```json
+{
+  "version": 2,
+  "master_meta": "<original_PBKDF2_salt>",
+  "entries": [
+    {
+      "site_name": "GitHub",
+      "username": "<AES-256-GCM encrypted>",
+      "encrypted_password": "<AES-256-GCM encrypted>",
+      ...
+    }
+  ]
+}
+```
 
-7.2. Smart Desktop-to-Mobile Flow
+**Why embed the salt?** When you install VaultKey on a new phone, a *new* salt is generated. Without the original salt, your old Master Password produces a completely different AES-256 key — locking you out of your backup permanently. Embedding the salt solves this.
 
-    The website intelligently detects the user's platform.
-    Mobile Users: Clicking "Download APK" instantly triggers the download, accompanied by a sleek, glassmorphic toast notification sliding in to confirm the action.
-    Desktop Users: Clicking "Download APK" triggers a high-fidelity modal overlay displaying a QR Code. This prompts the user to scan the screen with their phone to install the APK directly where it belongs, while still providing a fallback text-link to download the .apk file to their PC.
+### Auto-Backup Behavior
+1. User grants folder access via Android SAF once
+2. Every vault modification (add/edit/delete) silently writes a new `.pnb` to that folder
+3. Previous `VaultKey_AutoBackup` files in that folder are **automatically deleted** to prevent storage bloat
 
-8. Final Summary
+### Smart Import / Merge
+- Skips **duplicate entries** already in the active vault
+- **Re-encrypts** all imported data with the current session key if the backup was made under a different master password
 
-VaultKey represents a masterclass in local-first mobile development. From managing complex PBKDF2 cryptography in a React Native environment to building a seamless, theme-aware UI and a highly optimized Web/Vite marketing presence, the project successfully balances uncompromising security with an exceptional user experience.
+---
+
+## 🚀 Getting Started (Development)
+
+### Prerequisites
+- Node.js ≥ 18
+- Expo CLI: `npm install -g expo-cli`
+- Android Studio (for emulator) or a physical Android device with **Developer Mode** enabled
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Siddhantpal08/VaultKey.git
+cd VaultKey
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the Expo dev server
+npm start
+
+# 4. Run on Android
+npm run android
+```
+
+### Build APK (Production)
+
+```bash
+# Requires EAS CLI: npm install -g eas-cli
+eas build --platform android --profile production
+```
+
+---
+
+## 🌐 Marketing Website
+
+A companion landing page (`website/`) is built with **HTML, CSS, and vanilla JS**, featuring:
+
+- **Dark Cyber Aesthetic** — deep space background with indigo/blue gradient diffusion
+- **3D Hero Element** — pure CSS `perspective` + `preserve-3d` rotating card (Shield → Key)
+- **CSS Animations** — `animate-pulse-glow`, `animate-float`, slide-in toast notifications
+- **Smart Download Flow**:
+  - 📱 **Mobile** → APK download triggers instantly with a glassmorphic toast confirmation
+  - 🖥️ **Desktop** → QR code modal appears for easy phone-side scanning, with a fallback direct link
+
+---
+
+## 🎨 UI/UX Design System
+
+- **Theming:** `ThemeContext` + `useStyles()` hook — live Light/Dark switching without app restarts
+- **Dark Mode:** `#060B17` deep background with glowing surface borders
+- **Navigation:** Custom `BottomTabBar.tsx` with pill-shaped active-glow indicators
+- **Modals:** Glassmorphic React Native overlays (not OS defaults) for brand consistency
+- **FABs:** Floating Action Buttons positioned to respect safe areas and the tab bar height
+
+---
+
+## 📁 Project Structure
+
+```
+VaultKey/
+├── src/                    # Core application source
+│   ├── screens/            # App screens (Home, Notes, TOTP, Generator, Settings)
+│   ├── components/         # Reusable UI components
+│   ├── context/            # ThemeContext, AuthContext
+│   ├── db/                 # SQLite database setup & migrations
+│   └── utils/              # crypto.ts, backup engine, TOTP logic
+├── assets/                 # Icons, splash screen, fonts
+├── website/                # Companion marketing website
+├── android/                # Native Android project files
+├── app.json                # Expo app configuration
+└── eas.json                # EAS Build profiles
+```
+
+---
+
+## ⚠️ Security Disclaimer
+
+VaultKey is a **local-first** application. All security guarantees depend on:
+1. The strength of your **Master Password** — use a long, unique passphrase.
+2. The physical security of your device.
+3. Keeping your `.pnb` backup files in a safe, private location.
+
+> **The developers cannot recover your data if you forget your Master Password.** There is no reset mechanism by design.
+
+---
+
+<div align="center">
+
+Built with ❤️ by [Siddhant Pal](https://github.com/Siddhantpal08)
+
+*VaultKey — Because your passwords deserve better than a cloud.*
+
+</div>
