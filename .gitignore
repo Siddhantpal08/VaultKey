@@ -40,3 +40,8 @@ yarn-error.*
 /ios
 /android
 crash_log.txt
+vaultkey_self_service.md
+VAULTKEY_BRAIN.md
+walkthrough.md
+implementation_plan.md
+
